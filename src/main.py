@@ -909,7 +909,7 @@ class POE2BoosterApp:
                                   "• 🌐 Real-time Ping: ติดตามค่าความหน่วงสัญญาณเน็ตได้ตลอดเวลา\n"
                                   "• ⏰ Smart Auto-Clean: ป้องกันเกมสะดุดจากการลืมล้างไฟล์แคชสะสม\n"
                                   "• 🎨 Custom Themes: ปรับแต่งโทนสี Overlay ได้ตามสไตล์ที่คุณชอบ",
-                     font=("Segoe UI", 9.5), bg=c["card"], fg=c["text_dim"], justify="left", wraplength=440).pack(pady=8)
+                     font=("Segoe UI", 10), bg=c["card"], fg=c["text_dim"], justify="left", wraplength=440).pack(pady=8)
             
             btn_act = tk.Label(lock_f, text="🔑  ไปที่หน้าใส่คีย์ใช้งาน", font=("Segoe UI Semibold", 10), bg=c["accent_dim"], fg="#fff", padx=16, pady=8, cursor="hand2")
             btn_act.pack(pady=12)
@@ -1083,11 +1083,11 @@ class POE2BoosterApp:
             msg_lbl.config(text="⏩ คืนสิทธิ์การเข้าถึงเป็นระดับใช้งานปกติเรียบร้อยแล้ว", fg=c["accent"])
 
         if config.IS_PRO:
-            deact_btn = tk.Label(btn_action_f, text="❌  ยกเลิกการล็อกอินคีย์นี้", font=("Segoe UI Semibold", 9.5), bg=c["border"], fg=c["danger"], padx=16, pady=8, cursor="hand2")
+            deact_btn = tk.Label(btn_action_f, text="❌  ยกเลิกการล็อกอินคีย์นี้", font=("Segoe UI Semibold", 10), bg=c["border"], fg=c["danger"], padx=16, pady=8, cursor="hand2")
             deact_btn.pack(side="left")
             deact_btn.bind("<Button-1>", lambda e: do_deactivate())
         else:
-            act_btn = tk.Label(btn_action_f, text="🔑  เปิดใช้งาน PRO", font=("Segoe UI Semibold", 9.5), bg=c["accent_dim"], fg="#fff", padx=16, pady=8, cursor="hand2")
+            act_btn = tk.Label(btn_action_f, text="🔑  เปิดใช้งาน PRO", font=("Segoe UI Semibold", 10), bg=c["accent_dim"], fg="#fff", padx=16, pady=8, cursor="hand2")
             act_btn.pack(side="left", padx=(0, 10))
             act_btn.bind("<Button-1>", lambda e: do_activate())
             act_btn.bind("<Enter>", lambda e: act_btn.config(bg=c["accent"]))

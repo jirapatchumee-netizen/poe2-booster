@@ -67,7 +67,7 @@ class SetupWizard:
 
         tk.Label(
             main, text=f"เวอร์ชัน {config.APP_VERSION} — สำหรับผู้เล่น Path of Exile 2",
-            font=("Segoe UI", 8.5),
+            font=("Segoe UI", 9),
             bg=c["panel_bg"], fg=c["text_dim"]
         ).pack(pady=(2, 10))
 
@@ -77,7 +77,7 @@ class SetupWizard:
         # Scan Area
         self.scan_label = tk.Label(
             main, text="🔍 กำลังสแกนประสิทธิภาพระบบของเครื่องคุณ...",
-            font=("Segoe UI", 9.5),
+            font=("Segoe UI", 10),
             bg=c["panel_bg"], fg=c["warning"]
         )
         self.scan_label.pack(pady=6)
@@ -115,8 +115,8 @@ class SetupWizard:
             info = tk.Frame(self.issues_frame, bg=c["card"], padx=16, pady=16)
             info.pack(fill="both", expand=True, pady=10)
             info.config(highlightbackground=c["border"], highlightthickness=1)
-            tk.Label(info, text="🎉 ระบบของคุณได้รับการปรับแต่งระดับดีเยี่ยมอยู่แล้ว", font=("Segoe UI Semibold", 9.5), bg=c["card"], fg=c["text"]).pack(pady=4)
-            tk.Label(info, text="กดปุ่ม 'เริ่มใช้งาน' เพื่อสลับเข้าสู่หน้าต่างทำงาน Overlay ในเกม", font=("Segoe UI", 8.5), bg=c["card"], fg=c["text_dim"]).pack()
+            tk.Label(info, text="🎉 ระบบของคุณได้รับการปรับแต่งระดับดีเยี่ยมอยู่แล้ว", font=("Segoe UI Semibold", 10), bg=c["card"], fg=c["text"]).pack(pady=4)
+            tk.Label(info, text="กดปุ่ม 'เริ่มใช้งาน' เพื่อสลับเข้าสู่หน้าต่างทำงาน Overlay ในเกม", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"]).pack()
 
             self._add_start_button("เริ่มใช้งาน →")
         else:
@@ -134,7 +134,7 @@ class SetupWizard:
                 tk.Label(hdr, text=issue["icon"], font=("Segoe UI Emoji", 12), bg=c["card"]).pack(side="left")
                 tk.Label(
                     hdr, text=issue["title"],
-                    font=("Segoe UI Semibold", 9.5),
+                    font=("Segoe UI Semibold", 10),
                     bg=c["card"], fg=c["text"]
                 ).pack(side="left", padx=8)
 
@@ -160,7 +160,7 @@ class SetupWizard:
             # Skip button
             skip_btn = tk.Label(
                 self.btn_frame, text="ข้ามการปรับแต่ง (ข้าพเจ้าปรับแต่งเอง)",
-                font=("Segoe UI", 8.5),
+                font=("Segoe UI", 9),
                 bg=c["panel_bg"], fg=c["text_dim"],
                 cursor="hand2"
             )
@@ -193,7 +193,7 @@ class SetupWizard:
         info.config(highlightbackground=c["border"], highlightthickness=1)
         tk.Label(info, text="🎉 ปรับปรุงเรียบร้อย!", font=("Segoe UI Semibold", 10), bg=c["card"], fg=c["success"]).pack(pady=4)
         tk.Label(info, text="ระบบล้าง Shader cache, จัด Power plan สำเร็จ\n"
-                              "กรุณากดเปิดใช้ Overlay ในเกม และบูสต์อีกครั้งเมื่อเปิดเกมจริง", font=("Segoe UI", 8.5), bg=c["card"], fg=c["text_dim"], justify="center").pack()
+                              "กรุณากดเปิดใช้ Overlay ในเกม และบูสต์อีกครั้งเมื่อเปิดเกมจริง", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"], justify="center").pack()
 
         self._add_start_button("เข้าสู่หน้าต่างหลัก →")
 
