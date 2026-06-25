@@ -5,10 +5,10 @@ Production version with:
 - Persistent top bar (like POE Overlay)
 - Expandable panel with boost actions
 - First-time setup wizard
-- System monitor with Real-time Ping (Pro)
+- System monitor with Real-time Ping
 - Auto-start option
 - Unified Bento Grid Dashboard with Tabs
-- Pro features (Auto-Boost, Smart Cache Clear, OBS Streamer Mode, Themes)
+- Auto-Boost, Smart Cache Clear, OBS Streamer Mode, Custom Themes
 - Win32 API overlay display affinity protection
 """
 
@@ -155,13 +155,13 @@ class POE2BoosterApp:
             v.pack(side="left", padx=(3, 0))
             self.stat_labels[key] = v
 
-        # Real-time Network Ping Stats (PRO Feature)
+        # Real-time Network Ping Stats
         f_ping = tk.Frame(bar, bg=c["bar_bg"])
         f_ping.pack(side="left", padx=5)
         tk.Label(f_ping, text="PING", font=("Segoe UI", 8),
                  bg=c["bar_bg"], fg=c["text_dim"]).pack(side="left")
-        v_ping = tk.Label(f_ping, text="🔒 Pro", font=("Segoe UI Semibold", 9),
-                           bg=c["bar_bg"], fg=c["pro_badge"], width=7, anchor="w")
+        v_ping = tk.Label(f_ping, text="--", font=("Segoe UI Semibold", 9),
+                           bg=c["bar_bg"], fg=c["success"], width=7, anchor="w")
         v_ping.pack(side="left", padx=(3, 0))
         self.stat_labels["ping"] = v_ping
 
@@ -277,7 +277,7 @@ class POE2BoosterApp:
 
     def _protect_window(self, win):
         """Hides window from screen capture if Streamer Mode is enabled"""
-        if config.IS_PRO and self.pro_streamer_mode:
+        if self.pro_streamer_mode:
             try:
                 win.update_idletasks()
                 hwnd = int(win.wm_frame(), 16)
@@ -289,7 +289,7 @@ class POE2BoosterApp:
         """Apply OBS Streamer Mode display affinity to the main bar window"""
         hwnd = self._get_hwnd()
         try:
-            if config.IS_PRO and self.pro_streamer_mode:
+            if self.pro_streamer_mode:
                 ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0x00000011)
             else:
                 ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0)
@@ -308,15 +308,12 @@ class POE2BoosterApp:
                     ram = psutil.virtual_memory().percent
                     gpu_t, vram = booster.get_gpu_stats()
                     
-                    # Update ping only if Pro, every 4 seconds (2 cycles)
-                    ping_val = -1
+                    # Update ping every 4 seconds (2 cycles)
                     ping_counter += 1
-                    if config.IS_PRO and ping_counter >= 2:
+                    if ping_counter >= 2:
                         ping_counter = 0
                         ping_val = booster.check_network_ping()
                         self.stats["ping"] = ping_val
-                    elif not config.IS_PRO:
-                        self.stats["ping"] = -1
                         
                     self.stats.update({"cpu": cpu, "ram": ram, "gpu_temp": gpu_t, "vram": vram})
                     self.root.after(0, self._update_bar_ui)
@@ -350,13 +347,12 @@ class POE2BoosterApp:
             self.stat_labels["ram"].config(text=f"{ram:.0f}%", fg=self._color(ram))
             self.stat_labels["gpu"].config(text=f"{gpu:.0f}°C", fg=self._color(gpu, 90))
             
-            if config.IS_PRO:
-                if ping >= 998:
-                    self.stat_labels["ping"].config(text="Offline", fg=c["danger"])
-                else:
-                    self.stat_labels["ping"].config(text=f"{ping:.0f}ms", fg=self._color_ping(ping))
+            if ping >= 998:
+                self.stat_labels["ping"].config(text="Offline", fg=c["danger"])
+            elif ping >= 0:
+                self.stat_labels["ping"].config(text=f"{ping:.0f}ms", fg=self._color_ping(ping))
             else:
-                self.stat_labels["ping"].config(text="🔒 Pro", fg=c["pro_badge"])
+                self.stat_labels["ping"].config(text="--", fg=c["text_dim"])
                 
             # If dashboard is currently open, refresh the dashboard values
             if self._dash_win and self._dash_win.winfo_exists():
@@ -365,10 +361,10 @@ class POE2BoosterApp:
             pass
 
     def _start_pro_services(self):
-        """Launch auto-boost detector and smart cache clean timers (Pro)"""
+        """Launch auto-boost detector and smart cache clean timers"""
         def auto_boost_loop():
             while self.monitor_running:
-                if config.IS_PRO and self.pro_auto_boost:
+                if self.pro_auto_boost:
                     running = booster.is_poe2_running()
                     if running and not self._game_was_running:
                         self._game_was_running = True
@@ -382,7 +378,7 @@ class POE2BoosterApp:
 
         def auto_clean_loop():
             while self.monitor_running:
-                if config.IS_PRO and self.pro_auto_clean:
+                if self.pro_auto_clean:
                     try:
                         size = booster.get_shader_cache_size_mb()
                         if size > 500:  # 500MB Threshold
@@ -482,6 +478,121 @@ class POE2BoosterApp:
         if self._dash_win and self._dash_win.winfo_exists():
             self.root.after(500, lambda: self._show_dashboard(tab="status"))
 
+        # ── Auto-Update after Boost ──
+        # If an update was detected, automatically download & install it
+        if self._update_info and not getattr(self, '_update_in_progress', False):
+            self.root.after(2500, lambda: self._silent_auto_update())
+
+    def _silent_auto_update(self):
+        """Headless auto-update: download, install, and restart without user interaction.
+        Shows progress on the overlay result bar so the user can see what's happening."""
+        if getattr(self, '_update_in_progress', False):
+            return
+        self._update_in_progress = True
+
+        info = self._update_info
+        if not info:
+            self._update_in_progress = False
+            return
+
+        version = info["version"]
+        download_url = info.get("download_url", "")
+        if not download_url:
+            self._update_in_progress = False
+            return
+
+        c = config.COLORS
+        is_frozen = getattr(sys, "frozen", False)
+
+        # Show starting message on the bar
+        self._show_boost_result(f"⬆ พบ {version} — กำลังดาวน์โหลดอัปเดตอัตโนมัติ...", c["accent"])
+        # Cancel auto-hide so the result bar stays visible during update
+        if self._result_hide_id:
+            self.root.after_cancel(self._result_hide_id)
+            self._result_hide_id = None
+
+        def callback(status, msg):
+            def ui():
+                try:
+                    if status == "downloading":
+                        try:
+                            pct_str = msg.split("%")[0].split()[-1]
+                            pct = int(pct_str)
+                        except Exception:
+                            pct = 0
+                        self.result_label.config(
+                            text=f"⬆ อัปเดต {version}:  ดาวน์โหลด {pct}%",
+                            fg=c["warning"]
+                        )
+                    elif status == "downloaded":
+                        self.result_label.config(
+                            text=f"✅ ดาวน์โหลด {version} เสร็จ — กำลังติดตั้ง...",
+                            fg=c["success"]
+                        )
+                    elif status == "installing":
+                        self.result_label.config(
+                            text=f"📦 ติดตั้ง {version}...",
+                            fg=c["accent"]
+                        )
+                    elif status == "error":
+                        self.result_label.config(
+                            text=f"❌ อัปเดตล้มเหลว: {msg}",
+                            fg=c["danger"]
+                        )
+                        self._update_in_progress = False
+                        self._result_hide_id = self.root.after(8000, self._hide_boost_result)
+                except Exception:
+                    pass
+            self.root.after(0, ui)
+
+        def countdown(sec):
+            """Countdown on the result bar then quit to restart"""
+            try:
+                if sec <= 0:
+                    self.result_label.config(
+                        text=f"🔄 กำลังรีสตาร์ทเป็น {version}...",
+                        fg=c["accent"]
+                    )
+                    self.root.after(500, lambda: self._quit(getattr(self, 'tray', None)))
+                    return
+                self.result_label.config(
+                    text=f"✅ อัปเดตเสร็จ! รีสตาร์ทอัตโนมัติใน {sec} วินาที...",
+                    fg=c["success"]
+                )
+                self.root.after(1000, lambda: countdown(sec - 1))
+            except Exception:
+                pass
+
+        def run_update():
+            temp_path = updater.download_to_temp(download_url, callback=callback)
+            if not temp_path:
+                self._update_in_progress = False
+                return
+
+            if is_frozen:
+                # .exe mode: apply update and restart
+                ok = updater.apply_update_and_restart(temp_path, callback=callback)
+                if ok:
+                    self.root.after(0, lambda: countdown(3))
+                else:
+                    self._update_in_progress = False
+            else:
+                # Dev mode: just download, show location, don't auto-restart
+                def show_done():
+                    self.result_label.config(
+                        text=f"✅ ดาวน์โหลด {version} เสร็จ — ไฟล์อยู่ที่: {os.path.basename(temp_path)}",
+                        fg=c["success"]
+                    )
+                    self._update_in_progress = False
+                    self._result_hide_id = self.root.after(10000, self._hide_boost_result)
+                    try:
+                        os.startfile(os.path.dirname(temp_path))
+                    except Exception:
+                        pass
+                self.root.after(0, show_done)
+
+        threading.Thread(target=run_update, daemon=True).start()
+
     def _show_boost_result(self, text, color):
         def update():
             if self._result_hide_id:
@@ -554,8 +665,7 @@ class POE2BoosterApp:
         nav_items = [
             ("status", "📊  สถานะระบบ"),
             ("optimizer", "🎮  ปรับแต่งเกม"),
-            ("pro_settings", "💎  ฟีเจอร์ PRO"),
-            ("activation", "🔑  เปิดใช้งาน PRO")
+            ("advanced", "⚙️  ตั้งค่าขั้นสูง"),
         ]
 
         def handle_nav_click(target):
@@ -612,10 +722,10 @@ class POE2BoosterApp:
             self._render_status_tab()
         elif target_tab == "optimizer":
             self._render_optimizer_tab()
-        elif target_tab == "pro_settings":
-            self._render_pro_settings_tab()
-        elif target_tab == "activation":
-            self._render_activation_tab()
+        elif target_tab == "advanced":
+            self._render_advanced_settings_tab()
+        elif target_tab == "settings":
+            self._render_advanced_settings_tab()
 
     # ── TAB 1: STATUS & BENTO GRID ───────────────────────
     def _render_status_tab(self):
@@ -681,7 +791,7 @@ class POE2BoosterApp:
         c4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
         c4.config(highlightbackground=c["border"], highlightthickness=1)
         tk.Label(c4, text="🌐  Network Ping", font=("Segoe UI Semibold", 9), bg=c["card"], fg=c["text_dim"]).pack(anchor="w")
-        v4 = tk.Label(c4, text="🔒 PRO", font=("Segoe UI Bold", 20), bg=c["card"], fg=c["pro_badge"])
+        v4 = tk.Label(c4, text="-- ms", font=("Segoe UI Bold", 20), bg=c["card"], fg=c["success"])
         v4.pack(anchor="w", pady=4)
         cv4 = tk.Canvas(c4, bg=c["border"], height=4, highlightthickness=0, bd=0)
         cv4.pack(fill="x", pady=4)
@@ -741,16 +851,15 @@ class POE2BoosterApp:
             # 4. PING
             ping = self.stats.get("ping", -1)
             v_lbl, canvas = self._bento_widgets["ping"]
-            if config.IS_PRO:
-                if ping >= 998:
-                    v_lbl.config(text="Offline", fg=c["danger"])
-                    self._fill_dash_canvas(canvas, 100, c["danger"])
-                else:
-                    v_lbl.config(text=f"{ping:.0f} ms", fg=self._color_ping(ping))
-                    ping_pct = min(100, int(ping / 300 * 100))  # Scale 300ms as max
-                    self._fill_dash_canvas(canvas, ping_pct, self._color_ping(ping))
+            if ping >= 998:
+                v_lbl.config(text="Offline", fg=c["danger"])
+                self._fill_dash_canvas(canvas, 100, c["danger"])
+            elif ping >= 0:
+                v_lbl.config(text=f"{ping:.0f} ms", fg=self._color_ping(ping))
+                ping_pct = min(100, int(ping / 300 * 100))  # Scale 300ms as max
+                self._fill_dash_canvas(canvas, ping_pct, self._color_ping(ping))
             else:
-                v_lbl.config(text="🔒 PRO", fg=c["pro_badge"])
+                v_lbl.config(text="-- ms", fg=c["text_dim"])
                 self._fill_dash_canvas(canvas, 0, c["border"])
         except Exception:
             pass
@@ -1106,7 +1215,7 @@ class POE2BoosterApp:
             buy_lbl.bind("<Button-1>", lambda e: open_buy())
 
     # ══════════════════════════════════════════════════════
-    #   AUTO-UPDATE (UNCHANGED 1.3.1 CORE FLOW)
+    #   AUTO-UPDATE (with silent auto-update via Boost)
     # ══════════════════════════════════════════════════════
     def _check_update(self):
         """Check GitHub for new version in background"""

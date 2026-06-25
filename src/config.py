@@ -1,20 +1,20 @@
 """
 POE2 Booster — Config Module
-Handles app metadata, color themes, licensing, and global settings persistence.
+Handles app metadata, color themes, and global settings persistence.
+ฟีเจอร์ทั้งหมดเปิดใช้งานฟรี — ไม่ต้องใช้ License Key
 """
 
 import os
 import json
 
 APP_NAME = "POE2 Booster"
-APP_VERSION = "1.3.2"  # Bump version for UI Overhaul & Pro features
+APP_VERSION = "1.4.0"  # ปลดล็อกฟีเจอร์ทั้งหมดให้ใช้ฟรี
 APP_AUTHOR = "POE2 Booster Team"
 APP_WEBSITE = "https://poe2booster.com"
 HOTKEY = "F4"
 
-# Global license / status state
-IS_PRO = False
-LICENSE_KEY = None
+# สถานะ Pro — เปิดถาวร (ฟีเจอร์ทุกตัวปลดล็อกแล้ว)
+IS_PRO = True
 CURRENT_THEME = "blue"
 
 # ── Themes Palette ───────────────────────────────────────
@@ -98,66 +98,34 @@ def get_config_path():
     return os.path.join(appdata, "POE2Booster", "config.json")
 
 
-def verify_license(key):
-    """
-    Offline validation helper for license keys.
-    Format: POE2-PRO-XXXX-XXXX-XXXX
-    Must start with POE2-PRO- and have alphanumeric parts.
-    """
-    if not key:
-        return False
-    
-    clean_key = key.strip().upper()
-    if clean_key in ["POE2-PRO-TRIAL", "POE2-PRO-TEST"]:
-        return True
-        
-    if not clean_key.startswith("POE2-PRO-"):
-        return False
-        
-    parts = clean_key.split("-")
-    # Expected: ['POE2', 'PRO', 'XXXX', 'XXXX', 'XXXX'] or similar
-    if len(parts) < 4:
-        return False
-        
-    # Check that all parts are alphanumeric and non-empty
-    for part in parts[2:]:
-        if not part.isalnum() or len(part) == 0:
-            return False
-            
-    return True
-
-
 def load_config():
-    """Load configuration from disk and populate global states"""
-    global IS_PRO, LICENSE_KEY, CURRENT_THEME, COLORS
+    """โหลดการตั้งค่าจากไฟล์ config"""
+    global CURRENT_THEME, COLORS
     path = get_config_path()
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                
-            LICENSE_KEY = data.get("license_key")
-            IS_PRO = verify_license(LICENSE_KEY)
-            
+
             theme = data.get("theme", "blue")
             if theme in THEMES:
                 CURRENT_THEME = theme
                 COLORS = THEMES[theme]
-                
+
             return data
         except Exception:
             pass
     return {}
 
 
-def save_config_file(license_key=None, theme=None, auto_start=None, first_run_complete=True, **kwargs):
-    """Save settings back to the config file"""
-    global IS_PRO, LICENSE_KEY, CURRENT_THEME, COLORS
-    
+def save_config_file(theme=None, auto_start=None, first_run_complete=True, **kwargs):
+    """บันทึกการตั้งค่าลงไฟล์ config"""
+    global CURRENT_THEME, COLORS
+
     path = get_config_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    
-    # Load current data to merge
+
+    # โหลดข้อมูลเดิมเพื่อ merge
     data = {}
     if os.path.exists(path):
         try:
@@ -165,29 +133,24 @@ def save_config_file(license_key=None, theme=None, auto_start=None, first_run_co
                 data = json.load(f)
         except Exception:
             pass
-            
-    if license_key is not None:
-        data["license_key"] = license_key.strip().upper()
-        LICENSE_KEY = data["license_key"]
-        IS_PRO = verify_license(LICENSE_KEY)
-        
+
     if theme is not None:
         if theme in THEMES:
             data["theme"] = theme
             CURRENT_THEME = theme
             COLORS = THEMES[theme]
-            
+
     if auto_start is not None:
         data["auto_start"] = auto_start
-        
+
     data["first_run_complete"] = first_run_complete
     data["version"] = APP_VERSION
-    
-    # Merge additional settings (Auto-Boost, Streamer mode, etc.)
+
+    # Merge ค่าเพิ่มเติม (Auto-Boost, Streamer mode ฯลฯ)
     for k, v in kwargs.items():
         if v is not None:
             data[k] = v
-            
+
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
@@ -197,7 +160,7 @@ def save_config_file(license_key=None, theme=None, auto_start=None, first_run_co
 
 
 def switch_theme(theme_name):
-    """Switch active theme dynamically and save config"""
+    """เปลี่ยนธีมสีแบบ Dynamic และบันทึก config"""
     global CURRENT_THEME, COLORS
     if theme_name in THEMES:
         CURRENT_THEME = theme_name
@@ -207,5 +170,5 @@ def switch_theme(theme_name):
     return False
 
 
-# Auto-load on import
+# โหลดอัตโนมัติเมื่อ import
 load_config()

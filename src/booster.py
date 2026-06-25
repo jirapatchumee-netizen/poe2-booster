@@ -247,27 +247,32 @@ def get_poe2_config_path():
 
 
 def get_poe2_config_optimizations():
-    """Get the mapping of optimal settings for POE2"""
+    """Get the mapping of optimal settings for POE2 — Updated June 2026"""
     return {
         "DISPLAY": {
             "renderer_type": "Vulkan",
             "use_dynamic_resolution": "true",
-            "water_detail": "0",
+            "dynamic_resolution_fps_target": "60",
             "shadow_type": "Low",
-            "light_quality": "0",
             "global_illumination_detail": "0",
-            "texture_quality": "TextureQualityLow",
+            "light_quality": "1",
+            "water_detail": "1",
+            "texture_quality": "TextureQualityMedium",
+            "texture_filtering": "Anisotropic8x",
             "use_dynamic_particle_culling2": "true",
+            "anti_aliasing_mode": "TAA",
+            "screen_shake_enabled": "false",
+            "vsync": "false",
+            "max_foreground_fps": "0",
+            "max_background_fps": "30",
         },
         "SOUND": {
             "channel_count": "low",
             "reverb_enabled2": "false",
-            "music_volume2": "0",
-            "ambient_sound_volume2": "0",
-            "dialogue_sound_volume2": "0",
         },
         "GENERAL": {
             "engine_multithreading_mode": "enabled",
+            "networking_type": "predictive",
         }
     }
 
