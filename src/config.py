@@ -3,7 +3,7 @@ POE2 Booster — config module
 """
 
 APP_NAME = "POE2 Booster"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 APP_AUTHOR = "POE2 Booster Team"
 APP_WEBSITE = "https://poe2booster.com"
 HOTKEY = "F4"

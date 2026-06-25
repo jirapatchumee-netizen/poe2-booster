@@ -289,6 +289,9 @@ class POE2BoosterApp:
         if r.get("power_set"):
             parts.append("⚡ High Perf")
 
+        if r.get("overlays_optimized", 0) > 0:
+            parts.append(f"⬇️ {r['overlays_optimized']} Overlays")
+
         if parts:
             summary = "✅  " + "  ·  ".join(parts)
             self._show_boost_result(summary, C["success"])
@@ -636,6 +639,49 @@ class POE2BoosterApp:
                      bg=C["card"], fg=C["danger"]).pack(anchor="w")
             tk.Label(opt_frame, text="กรุณาเข้าเล่นเกม Path of Exile 2 อย่างน้อย 1 ครั้ง เพื่อให้ระบบสร้างไฟล์",
                      font=("Segoe UI", 8), bg=C["card"], fg=C["text_dim"]).pack(anchor="w", pady=(2, 0))
+
+        # ── Section: Overlay Conflicts ──
+        conflicts = booster.scan_overlay_conflicts()
+        if conflicts:
+            self._tip_heading(content, "⚠️  พบแอป Overlay ที่อาจทำให้เกมกระตุก")
+            
+            conflict_frame = tk.Frame(content, bg=C["card"], padx=12, pady=10)
+            conflict_frame.pack(fill="x", padx=16, pady=4)
+            conflict_frame.config(highlightbackground=C["warning"], highlightthickness=1)
+            
+            info_lbl = tk.Label(conflict_frame, text="ตรวจพบแอป Overlay รันอยู่เบื้องหลัง:",
+                                font=("Segoe UI Semibold", 9), bg=C["card"], fg=C["warning"])
+            info_lbl.pack(anchor="w", pady=(0, 4))
+            
+            for c in conflicts:
+                app_name = c["display_name"]
+                tip_text = c["tip"]
+                
+                app_lbl = tk.Label(conflict_frame, text=f"• {app_name}", font=("Segoe UI Semibold", 9),
+                                   bg=C["card"], fg=C["text"])
+                app_lbl.pack(anchor="w")
+                
+                tip_lbl = tk.Label(conflict_frame, text=tip_text, font=("Segoe UI", 8),
+                                   bg=C["card"], fg=C["text_dim"], wraplength=400, justify="left")
+                tip_lbl.pack(anchor="w", padx=12, pady=(0, 4))
+                
+            btn_opt = tk.Label(conflict_frame, text="⚡ ลดภาระ CPU ของแอปเหล่านี้", font=("Segoe UI Semibold", 9),
+                               bg=C["accent_dim"], fg="#ffffff", padx=12, pady=6, cursor="hand2")
+            btn_opt.pack(anchor="w", pady=(4, 0))
+            
+            opt_msg = tk.Label(conflict_frame, text="", font=("Segoe UI", 8), bg=C["card"], fg=C["success"])
+            opt_msg.pack(anchor="w", pady=(4, 0))
+            
+            def do_opt_overlays(e):
+                count = booster.optimize_overlay_priorities()
+                if count > 0:
+                    opt_msg.config(text=f"✅ ปรับลด CPU ของแอป Overlay {count} รายการ เรียบร้อย!", fg=C["success"])
+                else:
+                    opt_msg.config(text="✅ ปรับลด CPU เรียบร้อยแล้ว หรือไม่พบแอปเพิ่ม", fg=C["success"])
+                    
+            btn_opt.bind("<Button-1>", do_opt_overlays)
+            btn_opt.bind("<Enter>", lambda e: btn_opt.config(bg=C["accent"]))
+            btn_opt.bind("<Leave>", lambda e: btn_opt.config(bg=C["accent_dim"]))
 
         # ── Section: In-game ──
         self._tip_heading(content, "🎮  คำแนะนำการตั้งค่าในเกมตามสูตรแอดมิน")

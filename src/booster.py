@@ -166,6 +166,9 @@ def boost_all():
     # 6. Set High Performance power plan
     results["power_set"] = set_high_performance()
 
+    # 7. Optimize conflicting overlay priorities (Discord/Overwolf)
+    results["overlays_optimized"] = optimize_overlay_priorities()
+
     return results
 
 
@@ -394,4 +397,66 @@ def revert_poe2_config(file_path):
         return True, "คืนค่าการตั้งค่าเดิมสำเร็จ!"
     except Exception as e:
         return False, f"เกิดข้อผิดพลาด: {str(e)}"
+
+
+def optimize_overlay_priorities():
+    """Lower the priority of overlay processes to BELOW_NORMAL to reduce stuttering in POE2"""
+    targets = ["Discord.exe", "Overwolf.exe", "OverwolfHelper.exe", "Awakened PoE Trade.exe", "AwakenedPoETrade.exe"]
+    optimized_count = 0
+    for proc in psutil.process_iter(["name"]):
+        try:
+            name = proc.info["name"]
+            if name and any(t.lower() == name.lower() for t in targets):
+                # Set priority to BELOW_NORMAL
+                proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                optimized_count += 1
+        except Exception:
+            pass
+    return optimized_count
+
+
+def scan_overlay_conflicts():
+    """Scan running processes for active overlays. Returns list of dicts with name, display_name, and tip"""
+    conflicts = []
+    targets = {
+        "Discord.exe": {
+            "name": "Discord",
+            "tip": "แนะนำให้ปิด 'Discord Overlay' ในตั้งค่าของ Discord (Settings -> Game Overlay) เพื่อความเสถียร"
+        },
+        "Overwolf.exe": {
+            "name": "Overwolf",
+            "tip": "แนะนำให้เปิดเฉพาะตัวเช็กราคา และหลีกเลี่ยงการกดเช็กราคาขณะดึงฝูงมอนสเตอร์"
+        },
+        "OverwolfHelper.exe": {
+            "name": "Overwolf Helper",
+            "tip": "แนะนำให้เปิดเฉพาะตัวเช็กราคา และหลีกเลี่ยงการกดเช็กราคาขณะดึงฝูงมอนสเตอร์"
+        },
+        "Awakened PoE Trade.exe": {
+            "name": "Awakened PoE Trade",
+            "tip": "หลีกเลี่ยงการกดเช็กราคาขณะดึงฝูงมอนสเตอร์เพื่อป้องกันปัญหา CPU spikes และเฟรมร่วง"
+        },
+        "AwakenedPoETrade.exe": {
+            "name": "Awakened PoE Trade",
+            "tip": "หลีกเลี่ยงการกดเช็กราคาขณะดึงฝูงมอนสเตอร์เพื่อป้องกันปัญหา CPU spikes และเฟรมร่วง"
+        }
+    }
+    
+    seen = set()
+    for proc in psutil.process_iter(["name"]):
+        try:
+            name = proc.info["name"]
+            if name and name.lower() in (t.lower() for t in targets):
+                matched_key = next(k for k in targets if k.lower() == name.lower())
+                disp_name = targets[matched_key]["name"]
+                if disp_name not in seen:
+                    seen.add(disp_name)
+                    conflicts.append({
+                        "process_name": name,
+                        "display_name": disp_name,
+                        "tip": targets[matched_key]["tip"]
+                    })
+        except Exception:
+            pass
+    return conflicts
+
 
