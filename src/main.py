@@ -156,6 +156,7 @@ class POE2BoosterApp:
                                      bg="#1a4a1a", fg=C["success"], padx=8, pady=2,
                                      cursor="hand2")
         self._update_info = None
+        self._update_win = None  # Track update popup window
 
         # Close → tray
         close = tk.Label(bar, text="✕", font=("Segoe UI", 10, "bold"),
@@ -453,57 +454,313 @@ class POE2BoosterApp:
         threading.Thread(target=check, daemon=True).start()
 
     def _show_update_available(self, info):
-        """Show update button on bar when new version is found"""
+        """Show pulsing update badge on bar when new version is found"""
         version = info["version"]
         size_mb = info.get("size", 0) / (1024 * 1024)
         self.update_label.config(
-            text=f"🔄 Update {version}",
+            text=f"⬆ พบเวอร์ชันใหม่ {version} ({size_mb:.1f} MB)",
             bg="#1a4a1a", fg=C["success"]
         )
         self.update_label.pack(side="left", padx=4, pady=4)
-        self.update_label.bind("<Button-1>", lambda e: self._do_update())
+        self.update_label.bind("<Button-1>", lambda e: self._show_update_dialog())
         self.update_label.bind("<Enter>",
                                lambda e: self.update_label.config(bg=C["success"], fg="#fff"))
         self.update_label.bind("<Leave>",
                                lambda e: self.update_label.config(bg="#1a4a1a", fg=C["success"]))
-        # Also show in status bar briefly
-        self._status(f"🔄 พบเวอร์ชันใหม่ {version} ({size_mb:.1f} MB)", C["accent"])
+        # Pulse animation to draw attention
+        self._pulse_update_badge()
+        self._status(f"🔄 พบเวอร์ชันใหม่ {version}", C["accent"])
 
-    def _do_update(self):
-        """Download and install the update"""
-        if not self._update_info:
+    def _pulse_update_badge(self):
+        """Gentle pulse animation on update badge"""
+        if not self._update_info or self._update_win:
+            return
+        try:
+            cur = self.update_label.cget("bg")
+            nxt = "#2a6a2a" if cur == "#1a4a1a" else "#1a4a1a"
+            self.update_label.config(bg=nxt)
+            self.root.after(1200, self._pulse_update_badge)
+        except Exception:
+            pass
+
+    def _show_update_dialog(self):
+        """Show a proper update popup dialog"""
+        import webbrowser
+
+        if self._update_win and self._update_win.winfo_exists():
+            self._update_win.focus_force()
             return
 
-        # Disable button during download
-        self.update_label.config(text="⏳ 0%", bg=C["warning"], fg="#fff")
-        self.update_label.unbind("<Button-1>")
-        self.update_label.unbind("<Enter>")
-        self.update_label.unbind("<Leave>")
+        info = self._update_info
+        if not info:
+            return
 
-        def do():
+        version = info["version"]
+        size_mb = info.get("size", 0) / (1024 * 1024)
+        notes = info.get("notes", "") or "ไม่มีรายละเอียดเพิ่มเติม"
+        download_url = info.get("download_url", "")
+        is_frozen = getattr(sys, "frozen", False)
+
+        # ── Create dialog window ──
+        win = tk.Toplevel(self.root)
+        self._update_win = win
+        win.title("อัปเดตใหม่!")
+        win.overrideredirect(True)
+        win.attributes("-topmost", True)
+        win.configure(bg=C["panel_bg"])
+        w, h = 420, 400
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        win.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
+
+        # Border
+        border = tk.Frame(win, bg=C["accent"], padx=2, pady=2)
+        border.pack(fill="both", expand=True)
+        main = tk.Frame(border, bg=C["panel_bg"], padx=16, pady=12)
+        main.pack(fill="both", expand=True)
+
+        # ── Header ──
+        hdr = tk.Frame(main, bg=C["panel_bg"])
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="🔄 พบเวอร์ชันใหม่!",
+                 font=("Segoe UI Semibold", 14), bg=C["panel_bg"],
+                 fg=C["accent"]).pack(side="left")
+        close_btn = tk.Label(hdr, text="✕", font=("Segoe UI", 12, "bold"),
+                             bg=C["panel_bg"], fg=C["text_dim"], cursor="hand2")
+        close_btn.pack(side="right")
+        close_btn.bind("<Button-1>", lambda e: win.destroy())
+        close_btn.bind("<Enter>", lambda e: close_btn.config(fg=C["danger"]))
+        close_btn.bind("<Leave>", lambda e: close_btn.config(fg=C["text_dim"]))
+
+        tk.Frame(main, bg=C["border"], height=1).pack(fill="x", pady=8)
+
+        # ── Version comparison ──
+        ver_frame = tk.Frame(main, bg=C["card"], padx=12, pady=10)
+        ver_frame.pack(fill="x", pady=(0, 8))
+        ver_frame.config(highlightbackground=C["border"], highlightthickness=1)
+        tk.Label(ver_frame, text=f"เวอร์ชันปัจจุบัน:   v{APP_VERSION}",
+                 font=("Segoe UI", 10), bg=C["card"],
+                 fg=C["text_dim"]).pack(anchor="w")
+        tk.Label(ver_frame, text=f"เวอร์ชันใหม่:         {version}",
+                 font=("Segoe UI Semibold", 10), bg=C["card"],
+                 fg=C["success"]).pack(anchor="w")
+        tk.Label(ver_frame, text=f"ขนาดไฟล์:            {size_mb:.1f} MB",
+                 font=("Segoe UI", 10), bg=C["card"],
+                 fg=C["text_dim"]).pack(anchor="w")
+
+        # ── Release Notes ──
+        tk.Label(main, text="📋 มีอะไรใหม่:",
+                 font=("Segoe UI Semibold", 10), bg=C["panel_bg"],
+                 fg=C["text"]).pack(anchor="w", pady=(4, 2))
+        notes_frame = tk.Frame(main, bg=C["card"], padx=10, pady=8)
+        notes_frame.pack(fill="both", expand=True, pady=(0, 8))
+        notes_frame.config(highlightbackground=C["border"], highlightthickness=1)
+        display_notes = notes[:500] + ("..." if len(notes) > 500 else "")
+        notes_lbl = tk.Label(notes_frame, text=display_notes,
+                             font=("Segoe UI", 9), bg=C["card"],
+                             fg=C["text_dim"], wraplength=370, justify="left")
+        notes_lbl.pack(anchor="w")
+
+        # ── Progress bar (hidden initially) ──
+        prog_frame = tk.Frame(main, bg=C["panel_bg"])
+        prog_bar_bg = tk.Frame(prog_frame, bg=C["card"], height=22)
+        prog_bar_bg.pack(fill="x")
+        prog_bar_bg.pack_propagate(False)
+        prog_fill = tk.Frame(prog_bar_bg, bg=C["accent"], width=0)
+        prog_fill.place(x=0, y=0, relheight=1, width=0)
+        prog_text = tk.Label(prog_bar_bg, text="0%",
+                             font=("Segoe UI Semibold", 9), bg=C["card"],
+                             fg="#fff")
+        prog_text.place(relx=0.5, rely=0.5, anchor="center")
+        status_lbl = tk.Label(prog_frame, text="",
+                              font=("Segoe UI", 9), bg=C["panel_bg"],
+                              fg=C["text_dim"])
+        status_lbl.pack(anchor="w", pady=(4, 0))
+
+        # ── Buttons ──
+        btn_frame = tk.Frame(main, bg=C["panel_bg"])
+        btn_frame.pack(fill="x", pady=(4, 0))
+
+        def make_btn(parent, text, bg_color, fg_color, cmd):
+            b = tk.Label(parent, text=text, font=("Segoe UI Semibold", 10),
+                         bg=bg_color, fg=fg_color, padx=16, pady=6,
+                         cursor="hand2")
+            b.bind("<Button-1>", lambda e: cmd())
+            hover_bg = C.get("accent", "#3388ff")
+            b.bind("<Enter>", lambda e: b.config(bg=hover_bg))
+            b.bind("<Leave>", lambda e: b.config(bg=bg_color))
+            return b
+
+        # ── Countdown restart animation ──
+        def _countdown_restart(seconds_left, temp_path=None):
+            """Show animated countdown then quit so batch script takes over"""
+            if seconds_left <= 0:
+                # Time to quit — batch script will replace exe and restart
+                auto_btn.config(text="🔄 รีสตาร์ทตอนนี้!", bg=C["accent"])
+                status_lbl.config(text="🔄 กำลังปิดแอปเพื่ออัปเดต...", fg=C["accent"])
+                self.root.after(500, lambda: self._quit(getattr(self, "tray", None)))
+                return
+
+            dots = "." * (4 - seconds_left % 4)
+            auto_btn.config(
+                text=f"⏳ รีสตาร์ทใน {seconds_left} วินาที{dots}",
+                bg=C["success"], fg="#fff"
+            )
+            status_lbl.config(
+                text=f"✅ ดาวน์โหลดเสร็จแล้ว! แอปจะปิดและเปิดใหม่เป็นเวอร์ชัน {version} อัตโนมัติ",
+                fg=C["success"]
+            )
+            # Pulse the progress bar green
+            prog_fill.config(bg=C["success"])
+            prog_fill.place(x=0, y=0, relheight=1, relwidth=1)
+            prog_text.config(text=f"🔄 {seconds_left}s", bg=C["success"])
+
+            self.root.after(1000, lambda: _countdown_restart(seconds_left - 1, temp_path))
+
+        def do_auto_update():
+            """Download + auto-restart (for .exe mode)"""
+            # Disable buttons
+            auto_btn.config(text="⏳ กำลังดาวน์โหลด...", bg=C["warning"], cursor="")
+            auto_btn.unbind("<Button-1>")
+            auto_btn.unbind("<Enter>")
+            auto_btn.unbind("<Leave>")
+            close_btn.unbind("<Button-1>")  # Prevent closing during download
+            close_btn.config(fg=C["panel_bg"])
+            manual_btn.pack_forget()
+            prog_frame.pack(fill="x", pady=(0, 4), before=btn_frame)
+
             def callback(status, msg):
                 def ui():
                     if status == "downloading":
-                        self.update_label.config(text=f"⏳ {msg}", bg=C["warning"])
+                        try:
+                            pct_str = msg.split("%")[0].split()[-1]
+                            pct = int(pct_str)
+                        except Exception:
+                            pct = 0
+                        bar_w = max(1, int(prog_bar_bg.winfo_width() * pct / 100))
+                        prog_fill.place(x=0, y=0, relheight=1, width=bar_w)
+                        prog_text.config(text=f"{pct}%", bg=C["accent"] if pct > 40 else C["card"])
+                        status_lbl.config(text=msg, fg=C["warning"])
+                        auto_btn.config(text=f"⏳ ดาวน์โหลด {pct}%")
+                    elif status == "downloaded":
+                        prog_fill.place(x=0, y=0, relheight=1, relwidth=1)
+                        prog_text.config(text="100%", bg=C["accent"])
+                        status_lbl.config(text=f"✅ {msg}", fg=C["success"])
+                        auto_btn.config(text="✅ ดาวน์โหลดเสร็จ!", bg=C["success"])
                     elif status == "installing":
-                        self.update_label.config(text="📦 ติดตั้ง...", bg=C["accent"])
+                        status_lbl.config(text=f"📦 {msg}", fg=C["accent"])
                     elif status == "restarting":
-                        self.update_label.config(text="✅ รีสตาร์ท...", bg=C["success"])
+                        status_lbl.config(text=f"✅ {msg}", fg=C["success"])
                     elif status == "error":
-                        self.update_label.config(text=f"❌ {msg}", bg=C["danger"])
+                        status_lbl.config(text=f"❌ {msg}", fg=C["danger"])
+                        auto_btn.config(text="❌ ล้มเหลว", bg=C["danger"])
+                        close_btn.bind("<Button-1>", lambda e: win.destroy())
+                        close_btn.config(fg=C["text_dim"])
+                        _show_fallback_btn()
                 self.root.after(0, ui)
 
-            success = updater.download_and_replace(
-                self._update_info["download_url"],
-                callback=callback,
-            )
+            def run():
+                # Step 1: Download
+                temp_path = updater.download_to_temp(download_url, callback=callback)
+                if not temp_path:
+                    return
 
-            if success:
-                # Batch script will replace .exe after we exit
-                self.root.after(1000,
-                    lambda: self._quit(getattr(self, "tray", None)))
+                # Step 2: Prepare batch script for self-replace
+                ok = updater.apply_update_and_restart(temp_path, callback=callback)
+                if ok:
+                    # Step 3: Start countdown → quit
+                    self.root.after(0, lambda: _countdown_restart(3, temp_path))
+                else:
+                    self.root.after(0, _show_fallback_btn)
 
-        threading.Thread(target=do, daemon=True).start()
+            threading.Thread(target=run, daemon=True).start()
+
+        def do_download_only():
+            """Download-only mode for non-.exe (opens Downloads folder after)"""
+            auto_btn.config(text="⏳ กำลังดาวน์โหลด...", bg=C["warning"], cursor="")
+            auto_btn.unbind("<Button-1>")
+            auto_btn.unbind("<Enter>")
+            auto_btn.unbind("<Leave>")
+            prog_frame.pack(fill="x", pady=(0, 4), before=btn_frame)
+
+            def callback(status, msg):
+                def ui():
+                    if status == "downloading":
+                        try:
+                            pct_str = msg.split("%")[0].split()[-1]
+                            pct = int(pct_str)
+                        except Exception:
+                            pct = 0
+                        bar_w = max(1, int(prog_bar_bg.winfo_width() * pct / 100))
+                        prog_fill.place(x=0, y=0, relheight=1, width=bar_w)
+                        prog_text.config(text=f"{pct}%", bg=C["accent"] if pct > 40 else C["card"])
+                        status_lbl.config(text=msg, fg=C["warning"])
+                        auto_btn.config(text=f"⏳ ดาวน์โหลด {pct}%")
+                    elif status == "downloaded":
+                        prog_fill.place(x=0, y=0, relheight=1, relwidth=1)
+                        prog_text.config(text="100%", bg=C["success"])
+                    elif status == "error":
+                        status_lbl.config(text=f"❌ {msg}", fg=C["danger"])
+                        auto_btn.config(text="❌ ล้มเหลว", bg=C["danger"])
+                self.root.after(0, ui)
+
+            def run():
+                dest = updater.download_to_temp(download_url, callback=callback)
+                if dest:
+                    def show_done():
+                        auto_btn.config(text="✅ ดาวน์โหลดเสร็จ!", bg=C["success"])
+                        status_lbl.config(
+                            text=f"📂 ไฟล์อยู่ที่: {dest}\nเปิดโฟลเดอร์ให้แล้ว — นำไฟล์ไปแทนที่ตัวเก่าแล้วเปิดใหม่",
+                            fg=C["success"]
+                        )
+                        # Open the folder containing the downloaded file
+                        try:
+                            folder = os.path.dirname(dest)
+                            os.startfile(folder)
+                        except Exception:
+                            pass
+                    self.root.after(0, show_done)
+
+            threading.Thread(target=run, daemon=True).start()
+
+        def do_open_browser():
+            """Open GitHub release page in browser"""
+            release_url = updater.get_release_url(version)
+            try:
+                webbrowser.open(release_url)
+                status_lbl.config(text="🌐 เปิดหน้าดาวน์โหลดในเบราว์เซอร์แล้ว")
+                prog_frame.pack(fill="x", pady=(0, 4), before=btn_frame)
+            except Exception:
+                status_lbl.config(text="❌ ไม่สามารถเปิดเบราว์เซอร์ได้")
+
+        def _show_fallback_btn():
+            """Show manual download button as fallback"""
+            fb = tk.Label(btn_frame, text="🌐 ดาวน์โหลดจากเว็บแทน",
+                          font=("Segoe UI Semibold", 10),
+                          bg="#1a3a5a", fg="#6ab7ff", padx=16, pady=6,
+                          cursor="hand2")
+            fb.pack(side="left", fill="x", expand=True, padx=(0, 2), pady=(4, 0))
+            fb.bind("<Button-1>", lambda e: do_open_browser())
+
+        # ── Build buttons based on mode ──
+        if is_frozen:
+            auto_btn = make_btn(btn_frame, "⬆ อัปเดตและรีสตาร์ทอัตโนมัติ",
+                                C["accent_dim"], "#fff", do_auto_update)
+            auto_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
+            manual_btn = make_btn(btn_frame, "🌐 เว็บ",
+                                  C["card"], C["text_dim"], do_open_browser)
+            manual_btn.pack(side="left", padx=(0, 0))
+        else:
+            auto_btn = make_btn(btn_frame, "⬇ ดาวน์โหลด .exe ใหม่",
+                                C["accent_dim"], "#fff", do_download_only)
+            auto_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
+            manual_btn = make_btn(btn_frame, "🌐 เว็บ",
+                                  C["card"], C["text_dim"], do_open_browser)
+            manual_btn.pack(side="left", padx=(0, 0))
+
+        # Draggable header
+        for w_drag in [hdr]:
+            w_drag.bind("<ButtonPress-1>", lambda e: setattr(win, '_dx', e.x_root - win.winfo_x()) or setattr(win, '_dy', e.y_root - win.winfo_y()))
+            w_drag.bind("<B1-Motion>", lambda e: win.geometry(f"+{e.x_root - win._dx}+{e.y_root - win._dy}"))
 
     # ══════════════════════════════════════════════════════
     #   TIPS PANEL
