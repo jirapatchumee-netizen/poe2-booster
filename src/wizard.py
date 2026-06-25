@@ -1,14 +1,16 @@
 """
 POE2 Booster — First-Time Setup Wizard
 Shows on first launch, scans system, offers one-click fix
+======================================================
 """
 
 import tkinter as tk
 import threading
 import os
 import json
+import ctypes
 
-from config import COLORS as C, APP_NAME, APP_VERSION
+import config
 
 
 class SetupWizard:
@@ -22,143 +24,193 @@ class SetupWizard:
         self.issues = []
 
     def show(self):
+        c = config.COLORS
         self.window = tk.Toplevel(self.parent)
-        self.window.title(f"{APP_NAME} — Setup")
+        self.window.title(f"{config.APP_NAME} — Setup")
         self.window.overrideredirect(True)
         self.window.attributes("-topmost", True)
         self.window.attributes("-alpha", 0.96)
-        self.window.configure(bg=C["wizard_bg"])
+        self.window.configure(bg=c["panel_bg"])
 
         w, h = 460, 520
         sw = self.window.winfo_screenwidth()
         sh = self.window.winfo_screenheight()
         self.window.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
 
-        main = tk.Frame(self.window, bg=C["wizard_bg"], padx=24, pady=20)
+        # Streamer mode protection if enabled (though first run usually not enabled yet)
+        if config.IS_PRO:
+            try:
+                self.window.update_idletasks()
+                hwnd = int(self.window.wm_frame(), 16)
+                ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0x00000011)
+            except Exception:
+                pass
+
+        # Border
+        border = tk.Frame(self.window, bg=c["border"], padx=1, pady=1)
+        border.pack(fill="both", expand=True)
+
+        main = tk.Frame(border, bg=c["panel_bg"], padx=24, pady=20)
         main.pack(fill="both", expand=True)
 
         # Header
         tk.Label(
             main, text="👋", font=("Segoe UI Emoji", 28),
-            bg=C["wizard_bg"], fg=C["accent"]
+            bg=c["panel_bg"], fg=c["accent"]
         ).pack(pady=(0, 4))
 
         tk.Label(
-            main, text=f"Welcome to {APP_NAME}!",
-            font=("Segoe UI", 16, "bold"),
-            bg=C["wizard_bg"], fg=C["text"]
+            main, text=f"ยินดีต้อนรับสู่ {config.APP_NAME}!",
+            font=("Segoe UI Semibold", 14),
+            bg=c["panel_bg"], fg=c["text"]
         ).pack()
 
         tk.Label(
-            main, text=f"v{APP_VERSION}",
-            font=("Segoe UI", 9),
-            bg=C["wizard_bg"], fg=C["text_dim"]
-        ).pack(pady=(0, 12))
+            main, text=f"เวอร์ชัน {config.APP_VERSION} — สำหรับผู้เล่น Path of Exile 2",
+            font=("Segoe UI", 8.5),
+            bg=c["panel_bg"], fg=c["text_dim"]
+        ).pack(pady=(2, 10))
 
-        tk.Frame(main, bg=C["border"], height=1).pack(fill="x", pady=(0, 12))
+        # Divider
+        tk.Frame(main, bg=c["border"], height=1).pack(fill="x", pady=6)
 
-        # Scanning label
+        # Scan Area
         self.scan_label = tk.Label(
-            main, text="🔍 กำลังสแกนระบบ...",
-            font=("Segoe UI", 10),
-            bg=C["wizard_bg"], fg=C["warning"]
+            main, text="🔍 กำลังสแกนประสิทธิภาพระบบของเครื่องคุณ...",
+            font=("Segoe UI", 9.5),
+            bg=c["panel_bg"], fg=c["warning"]
         )
-        self.scan_label.pack(anchor="w", pady=(0, 8))
+        self.scan_label.pack(pady=6)
 
-        # Issues container
-        self.issues_frame = tk.Frame(main, bg=C["wizard_bg"])
-        self.issues_frame.pack(fill="both", expand=True)
+        # Issues Container
+        self.issues_frame = tk.Frame(main, bg=c["panel_bg"])
+        self.issues_frame.pack(fill="both", expand=True, pady=6)
 
-        # Buttons frame (hidden until scan completes)
-        self.btn_frame = tk.Frame(main, bg=C["wizard_bg"])
-        self.btn_frame.pack(fill="x", pady=(12, 0))
+        # Actions buttons area
+        self.btn_frame = tk.Frame(main, bg=c["panel_bg"])
+        self.btn_frame.pack(fill="x", side="bottom")
 
-        # Start scan
-        threading.Thread(target=self._scan, daemon=True).start()
+        # Draggable
+        main.bind("<ButtonPress-1>", lambda e: setattr(self.window, '_dx', e.x_root - self.window.winfo_x()) or setattr(self.window, '_dy', e.y_root - self.window.winfo_y()))
+        main.bind("<B1-Motion>", lambda e: self.window.geometry(f"+{e.x_root - self.window._dx}+{e.y_root - self.window._dy}"))
 
-    def _scan(self):
+        # Start scan in thread
+        threading.Thread(target=self._run_scan, daemon=True).start()
+
+    def _run_scan(self):
+        c = config.COLORS
         self.issues = self.booster.scan_system_issues()
-        self.window.after(0, self._show_results)
+        self.window.after(0, self._render_scan_results)
 
-    def _show_results(self):
+    def _render_scan_results(self):
+        c = config.COLORS
+        # Clear loading label
+        self.scan_label.pack_forget()
+
         if not self.issues:
-            self.scan_label.config(
-                text="✅ ระบบพร้อมใช้งาน! ไม่พบปัญหา",
-                fg=C["success"]
-            )
-            self._add_start_button()
-            return
+            # All Optimized
+            self.scan_label.config(text="✅ ไม่พบไฟล์ขยะหรือระบบคอขวดสะสม! ระบบพร้อมเล่นแล้ว", fg=c["success"])
+            self.scan_label.pack(pady=12)
 
-        self.scan_label.config(
-            text=f"⚠️ พบปัญหา {len(self.issues)} รายการ:",
-            fg=C["warning"]
-        )
+            info = tk.Frame(self.issues_frame, bg=c["card"], padx=16, pady=16)
+            info.pack(fill="both", expand=True, pady=10)
+            info.config(highlightbackground=c["border"], highlightthickness=1)
+            tk.Label(info, text="🎉 ระบบของคุณได้รับการปรับแต่งระดับดีเยี่ยมอยู่แล้ว", font=("Segoe UI Semibold", 9.5), bg=c["card"], fg=c["text"]).pack(pady=4)
+            tk.Label(info, text="กดปุ่ม 'เริ่มใช้งาน' เพื่อสลับเข้าสู่หน้าต่างทำงาน Overlay ในเกม", font=("Segoe UI", 8.5), bg=c["card"], fg=c["text_dim"]).pack()
 
-        for issue in self.issues:
-            card = tk.Frame(
-                self.issues_frame, bg=C["card"], padx=10, pady=8,
-            )
-            card.pack(fill="x", pady=3)
-            card.config(highlightbackground=C["border"], highlightthickness=1)
+            self._add_start_button("เริ่มใช้งาน →")
+        else:
+            # Issues found
+            self.scan_label.config(text=f"⚠️ ตรวจพบปัญหาประสิทธิภาพ {len(self.issues)} รายการที่แก้ไขได้!", fg=c["warning"])
+            self.scan_label.pack(pady=6)
 
-            tk.Label(
-                card, text=issue["icon"], font=("Segoe UI Emoji", 14),
-                bg=C["card"], fg=C["warning"]
-            ).pack(side="left", padx=(0, 8))
+            for issue in self.issues:
+                card = tk.Frame(self.issues_frame, bg=c["card"], padx=12, pady=10)
+                card.pack(fill="x", pady=4)
+                card.config(highlightbackground=c["border"], highlightthickness=1)
 
-            text_frame = tk.Frame(card, bg=C["card"])
-            text_frame.pack(side="left", fill="x", expand=True)
+                hdr = tk.Frame(card, bg=c["card"])
+                hdr.pack(fill="x")
+                tk.Label(hdr, text=issue["icon"], font=("Segoe UI Emoji", 12), bg=c["card"]).pack(side="left")
+                tk.Label(
+                    hdr, text=issue["title"],
+                    font=("Segoe UI Semibold", 9.5),
+                    bg=c["card"], fg=c["text"]
+                ).pack(side="left", padx=8)
 
-            tk.Label(
-                text_frame, text=issue["title"],
+                tk.Label(
+                    card, text=issue["desc"],
+                    font=("Segoe UI", 8),
+                    bg=c["card"], fg=c["text_dim"],
+                    wraplength=380, justify="left"
+                ).pack(anchor="w", padx=24, pady=(2, 0))
+
+            # Fix All button
+            fix_btn = tk.Label(
+                self.btn_frame, text="⚡  ล้างไฟล์ขยะและเพิ่มสปีดทันที (ปุ่มเดียว)",
                 font=("Segoe UI Semibold", 10),
-                bg=C["card"], fg=C["text"], anchor="w"
-            ).pack(anchor="w")
+                bg=c["accent_dim"], fg="#ffffff",
+                padx=20, pady=8, cursor="hand2"
+            )
+            fix_btn.pack(fill="x", pady=6)
+            fix_btn.bind("<Button-1>", lambda e: self._fix_all())
+            fix_btn.bind("<Enter>", lambda e: fix_btn.config(bg=c["accent"]))
+            fix_btn.bind("<Leave>", lambda e: fix_btn.config(bg=c["accent_dim"]))
 
-            tk.Label(
-                text_frame, text=issue["desc"],
-                font=("Segoe UI", 8),
-                bg=C["card"], fg=C["text_dim"], anchor="w"
-            ).pack(anchor="w")
-
-        # Fix All button
-        fix_btn = tk.Label(
-            self.btn_frame, text="🚀 แก้ทุกอย่าง (กดปุ่มเดียว)",
-            font=("Segoe UI Semibold", 11),
-            bg=C["accent_dim"], fg="#ffffff",
-            padx=20, pady=10, cursor="hand2"
-        )
-        fix_btn.pack(fill="x", pady=(0, 6))
-        fix_btn.bind("<Button-1>", lambda e: self._fix_all())
-        fix_btn.bind("<Enter>", lambda e: fix_btn.config(bg=C["accent"]))
-        fix_btn.bind("<Leave>", lambda e: fix_btn.config(bg=C["accent_dim"]))
-
-        self._add_start_button(text="ข้าม →")
+            # Skip button
+            skip_btn = tk.Label(
+                self.btn_frame, text="ข้ามการปรับแต่ง (ข้าพเจ้าปรับแต่งเอง)",
+                font=("Segoe UI", 8.5),
+                bg=c["panel_bg"], fg=c["text_dim"],
+                cursor="hand2"
+            )
+            skip_btn.pack(pady=4)
+            skip_btn.bind("<Button-1>", lambda e: self._finish())
 
     def _fix_all(self):
-        self.scan_label.config(text="🔄 กำลังแก้ไข...", fg=C["warning"])
+        c = config.COLORS
+        self.scan_label.config(text="🔄 กำลังปรับแต่งและล้างแคช...", fg=c["warning"])
         threading.Thread(target=self._run_fixes, daemon=True).start()
 
     def _run_fixes(self):
         results = self.booster.boost_all()
-        self.window.after(0, lambda: self.scan_label.config(
-            text="✅ แก้ไขทุกอย่างแล้ว!", fg=C["success"]
-        ))
+        self.window.after(0, self._render_fix_complete)
+
+    def _render_fix_complete(self):
+        c = config.COLORS
+        self.scan_label.config(text="✅ ปรับแต่งระบบสำเร็จแล้ว!", fg=c["success"])
+        
+        # Clear buttons
+        for w in self.btn_frame.winfo_children():
+            w.destroy()
+
+        info = tk.Frame(self.issues_frame, bg=c["card"], padx=16, pady=16)
+        # Clear issue list cards
+        for w in self.issues_frame.winfo_children():
+            w.destroy()
+        
+        info.pack(fill="both", expand=True, pady=10)
+        info.config(highlightbackground=c["border"], highlightthickness=1)
+        tk.Label(info, text="🎉 ปรับปรุงเรียบร้อย!", font=("Segoe UI Semibold", 10), bg=c["card"], fg=c["success"]).pack(pady=4)
+        tk.Label(info, text="ระบบล้าง Shader cache, จัด Power plan สำเร็จ\n"
+                              "กรุณากดเปิดใช้ Overlay ในเกม และบูสต์อีกครั้งเมื่อเปิดเกมจริง", font=("Segoe UI", 8.5), bg=c["card"], fg=c["text_dim"], justify="center").pack()
+
+        self._add_start_button("เข้าสู่หน้าต่างหลัก →")
 
     def _add_start_button(self, text="เริ่มใช้งาน →"):
+        c = config.COLORS
         start_btn = tk.Label(
             self.btn_frame, text=text,
-            font=("Segoe UI", 10),
-            bg=C["wizard_bg"], fg=C["text_dim"],
-            padx=10, pady=6, cursor="hand2"
+            font=("Segoe UI Semibold", 10),
+            bg=c["accent_dim"], fg="#fff",
+            padx=16, pady=8, cursor="hand2"
         )
-        start_btn.pack(fill="x")
+        start_btn.pack(fill="x", pady=6)
         start_btn.bind("<Button-1>", lambda e: self._finish())
-        start_btn.bind("<Enter>", lambda e: start_btn.config(fg=C["text"]))
-        start_btn.bind("<Leave>", lambda e: start_btn.config(fg=C["text_dim"]))
+        start_btn.bind("<Enter>", lambda e: start_btn.config(bg=c["accent"]))
+        start_btn.bind("<Leave>", lambda e: start_btn.config(bg=c["accent_dim"]))
 
     def _finish(self):
-        # Save first-run flag
         _save_first_run_complete()
         self.window.destroy()
         if self.on_complete:
@@ -167,18 +219,10 @@ class SetupWizard:
 
 def is_first_run():
     """Check if this is the first time running the app"""
-    config_path = _get_config_path()
+    config_path = config.get_config_path()
     return not os.path.exists(config_path)
 
 
 def _save_first_run_complete():
     """Mark first run as complete"""
-    config_path = _get_config_path()
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w") as f:
-        json.dump({"first_run_complete": True, "version": APP_VERSION}, f)
-
-
-def _get_config_path():
-    appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
-    return os.path.join(appdata, "POE2Booster", "config.json")
+    config.save_config_file(first_run_complete=True)
