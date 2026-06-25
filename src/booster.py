@@ -218,3 +218,180 @@ def scan_system_issues():
         })
 
     return issues
+
+
+def get_poe2_config_path():
+    """Locate the POE2 config file path dynamically"""
+    try:
+        import ctypes.wintypes
+        CSIDL_PERSONAL = 5       # My Documents
+        SHGFP_TYPE_CURRENT = 0
+        buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+        ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
+        docs = buf.value
+        path = os.path.join(docs, "My Games", "Path of Exile 2", "poe2_production_Config.ini")
+        if os.path.exists(path):
+            return path
+    except Exception:
+        pass
+    # Fallback to standard path
+    userprofile = os.environ.get("USERPROFILE", "")
+    if userprofile:
+        path = os.path.join(userprofile, "Documents", "My Games", "Path of Exile 2", "poe2_production_Config.ini")
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def get_poe2_config_optimizations():
+    """Get the mapping of optimal settings for POE2"""
+    return {
+        "DISPLAY": {
+            "renderer_type": "Vulkan",
+            "use_dynamic_resolution": "true",
+            "water_detail": "0",
+            "shadow_type": "Low",
+            "light_quality": "0",
+            "global_illumination_detail": "0",
+            "texture_quality": "TextureQualityLow",
+            "use_dynamic_particle_culling2": "true",
+        },
+        "SOUND": {
+            "channel_count": "low",
+            "reverb_enabled2": "false",
+            "music_volume2": "0",
+            "ambient_sound_volume2": "0",
+            "dialogue_sound_volume2": "0",
+        },
+        "GENERAL": {
+            "engine_multithreading_mode": "enabled",
+        }
+    }
+
+
+def check_poe2_config_status(file_path):
+    """Check which recommended settings are already applied. Returns (is_fully_optimized, current_values)"""
+    if not file_path or not os.path.exists(file_path):
+        return False, {}
+
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+
+        optimizations = get_poe2_config_optimizations()
+        current_values = {}
+        current_section = None
+
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                current_section = stripped[1:-1]
+                continue
+            if current_section in optimizations and "=" in stripped:
+                key, val = stripped.split("=", 1)
+                key = key.strip()
+                val = val.strip()
+                if key in optimizations[current_section]:
+                    if current_section not in current_values:
+                        current_values[current_section] = {}
+                    current_values[current_section][key] = val
+
+        # Check completeness
+        fully_optimized = True
+        for sec, keys in optimizations.items():
+            for key, opt_val in keys.items():
+                curr_val = current_values.get(sec, {}).get(key)
+                if curr_val != opt_val:
+                    fully_optimized = False
+                    break
+
+        return fully_optimized, current_values
+    except Exception:
+        return False, {}
+
+
+def optimize_poe2_config(file_path):
+    """Safely edit the POE2 ini file to apply optimal settings"""
+    if not file_path or not os.path.exists(file_path):
+        return False, "ไม่พบไฟล์ตั้งค่าของเกม"
+
+    try:
+        # Create a backup first
+        backup_path = file_path + ".backup"
+        import shutil
+        shutil.copy2(file_path, backup_path)
+        
+        # Read current lines
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        
+        optimizations = get_poe2_config_optimizations()
+        
+        # Parse and modify
+        new_lines = []
+        current_section = None
+        applied = {sec: set() for sec in optimizations}
+        
+        for line in lines:
+            stripped = line.strip()
+            # Detect section
+            if stripped.startswith("[") and stripped.endswith("]"):
+                # If we are leaving a section, and there are missing optimizations, append them
+                if current_section in optimizations:
+                    for key, val in optimizations[current_section].items():
+                        if key not in applied[current_section]:
+                            new_lines.append(f"{key}={val}\n")
+                            applied[current_section].add(key)
+                
+                current_section = stripped[1:-1]
+                new_lines.append(line)
+                continue
+            
+            # If we are inside an optimization section, check if this line is a key to optimize
+            if current_section in optimizations and "=" in stripped:
+                key, val = stripped.split("=", 1)
+                key = key.strip()
+                if key in optimizations[current_section]:
+                    opt_val = optimizations[current_section][key]
+                    new_lines.append(f"{key}={opt_val}\n")
+                    applied[current_section].add(key)
+                    continue
+            
+            new_lines.append(line)
+        
+        # Handle the very last section if it was one of our optimized sections
+        if current_section in optimizations:
+            for key, val in optimizations[current_section].items():
+                if key not in applied[current_section]:
+                    new_lines.append(f"{key}={val}\n")
+                    applied[current_section].add(key)
+        
+        # If any section was missing completely, append the section and its values
+        for sec, keys in optimizations.items():
+            if not any(k in applied[sec] for k in keys):
+                # Section didn't exist or wasn't processed
+                new_lines.append(f"\n[{sec}]\n")
+                for key, val in keys.items():
+                    new_lines.append(f"{key}={val}\n")
+        
+        # Write back
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+            
+        return True, "สำรองไฟล์เดิมและปรับแต่งสำเร็จ!"
+    except Exception as e:
+        return False, f"เกิดข้อผิดพลาด: {str(e)}"
+
+
+def revert_poe2_config(file_path):
+    """Revert the POE2 config file to the backup version"""
+    backup_path = file_path + ".backup"
+    if not os.path.exists(backup_path):
+        return False, "ไม่พบไฟล์สำรอง (.backup)"
+    try:
+        import shutil
+        shutil.copy2(backup_path, file_path)
+        return True, "คืนค่าการตั้งค่าเดิมสำเร็จ!"
+    except Exception as e:
+        return False, f"เกิดข้อผิดพลาด: {str(e)}"
+

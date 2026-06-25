@@ -514,7 +514,7 @@ class POE2BoosterApp:
         win.attributes("-alpha", 0.96)
         win.configure(bg=C["panel_bg"])
 
-        w, h = 460, 540
+        w, h = 460, 600
         sw = win.winfo_screenwidth()
         sh = win.winfo_screenheight()
         win.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
@@ -564,16 +564,91 @@ class POE2BoosterApp:
                  font=("Segoe UI", 8),
                  bg="#1a1a0d", fg=C["text_dim"]).pack(anchor="w")
 
+        # ── Section: Auto-Optimize Config ──
+        self._tip_heading(content, "⚡  ปรับแต่งไฟล์ Config อัตโนมัติ")
+        
+        cfg_path = booster.get_poe2_config_path()
+        
+        opt_frame = tk.Frame(content, bg=C["card"], padx=12, pady=10)
+        opt_frame.pack(fill="x", padx=16, pady=4)
+        opt_frame.config(highlightbackground=C["border"], highlightthickness=1)
+        
+        if cfg_path:
+            is_opt, _ = booster.check_poe2_config_status(cfg_path)
+            
+            status_text = "สถานะ: ปรับแต่งแล้ว (ดีมาก! ✅)" if is_opt else "สถานะ: ยังไม่ได้ปรับแต่งตามสูตรแอดมิน ⚠️"
+            status_color = C["success"] if is_opt else C["warning"]
+            
+            status_lbl = tk.Label(opt_frame, text=status_text, font=("Segoe UI Semibold", 9),
+                                  bg=C["card"], fg=status_color)
+            status_lbl.pack(anchor="w")
+            
+            path_lbl = tk.Label(opt_frame, text=f"ไฟล์: {os.path.basename(cfg_path)}", font=("Segoe UI", 8),
+                                 bg=C["card"], fg=C["text_dim"])
+            path_lbl.pack(anchor="w", pady=(2, 6))
+            
+            btn_frame = tk.Frame(opt_frame, bg=C["card"])
+            btn_frame.pack(fill="x", pady=(4, 0))
+            
+            # Auto-Apply Button
+            apply_btn = tk.Label(btn_frame, text="⚡ ใช้ค่าแนะนำของแอดมิน", font=("Segoe UI Semibold", 9),
+                                 bg=C["accent_dim"], fg="#ffffff", padx=12, pady=6, cursor="hand2")
+            apply_btn.pack(side="left", padx=(0, 8))
+            
+            # Revert Button (only if backup exists)
+            has_backup = os.path.exists(cfg_path + ".backup")
+            revert_btn = tk.Label(btn_frame, text="⏪ คืนค่าเดิม", font=("Segoe UI", 9),
+                                  bg=C["border"], fg=C["text"], padx=10, pady=6, cursor="hand2")
+            if has_backup:
+                revert_btn.pack(side="left")
+                
+            msg_lbl = tk.Label(opt_frame, text="", font=("Segoe UI", 8), bg=C["card"], fg=C["success"])
+            msg_lbl.pack(anchor="w", pady=(6, 0))
+            
+            def do_apply(e):
+                success, msg = booster.optimize_poe2_config(cfg_path)
+                if success:
+                    status_lbl.config(text="สถานะ: ปรับแต่งแล้ว (ดีมาก! ✅)", fg=C["success"])
+                    revert_btn.pack(side="left")
+                    msg_lbl.config(text="⚡ สำรองไฟล์เดิมและปรับแต่งสำเร็จ! กรุณารีสตาร์ทเกมหากเปิดอยู่", fg=C["success"])
+                else:
+                    msg_lbl.config(text=f"❌ {msg}", fg=C["danger"])
+                    
+            def do_revert(e):
+                success, msg = booster.revert_poe2_config(cfg_path)
+                if success:
+                    status_lbl.config(text="สถานะ: ยังไม่ได้ปรับแต่งตามสูตรแอดมิน ⚠️", fg=C["warning"])
+                    revert_btn.pack_forget()
+                    msg_lbl.config(text="⏪ คืนค่าการตั้งค่าเดิมเรียบร้อยแล้ว!", fg=C["success"])
+                else:
+                    msg_lbl.config(text=f"❌ {msg}", fg=C["danger"])
+                    
+            apply_btn.bind("<Button-1>", do_apply)
+            apply_btn.bind("<Enter>", lambda e: apply_btn.config(bg=C["accent"]))
+            apply_btn.bind("<Leave>", lambda e: apply_btn.config(bg=C["accent_dim"]))
+            
+            revert_btn.bind("<Button-1>", do_revert)
+            revert_btn.bind("<Enter>", lambda e: revert_btn.config(bg=C["card_hover"]))
+            revert_btn.bind("<Leave>", lambda e: revert_btn.config(bg=C["border"]))
+            
+        else:
+            tk.Label(opt_frame, text="❌ ไม่พบไฟล์ poe2_production_Config.ini", font=("Segoe UI Semibold", 9),
+                     bg=C["card"], fg=C["danger"]).pack(anchor="w")
+            tk.Label(opt_frame, text="กรุณาเข้าเล่นเกม Path of Exile 2 อย่างน้อย 1 ครั้ง เพื่อให้ระบบสร้างไฟล์",
+                     font=("Segoe UI", 8), bg=C["card"], fg=C["text_dim"]).pack(anchor="w", pady=(2, 0))
+
         # ── Section: In-game ──
-        self._tip_heading(content, "🎮  ปรับในเกม (สำคัญที่สุด)")
+        self._tip_heading(content, "🎮  คำแนะนำการตั้งค่าในเกมตามสูตรแอดมิน")
         for s, d in [
-            ("Renderer", "ลอง Vulkan (กระจาย CPU ดีกว่า DX12)"),
-            ("Shadows", "Low หรือ Off (งานหนัก CPU ที่สุด)"),
-            ("Ground Effects", "Off (ลดภาระ CPU คำนวณ particle)"),
-            ("Dynamic Res.", "On (GPU ทำงานต่อเนื่อง ไม่รอ CPU)"),
-            ("Frame Limit", "60 FPS (ลด frame ที่ CPU ต้องเตรียม)"),
-            ("Sound Channels", "Low (เสียงกิน CPU มากตอน mob เยอะ)"),
-            ("VSync", "On (ป้องกัน CPU ทำ frame เกิน)"),
+            ("Renderer", "ใช้ Vulkan (ลด CPU คอขวดอย่างเห็นได้ชัด)"),
+            ("Shadow Detail", "Low (ช่วยลดภาระ CPU ได้มากที่สุด)"),
+            ("Light Quality", "Low (ลดภาระการคำนวณแสงในด่าน)"),
+            ("Global Illum.", "Off (ปิดแสงเงาสะท้อนระดับสูงเพื่อความลื่น)"),
+            ("Texture Quality", "Low (ช่วยประหยัด VRAM และแรมระบบ)"),
+            ("Dynamic Res.", "เปิดใช้งาน (ช่วยรักษาเฟรมเรตให้สม่ำเสมอ)"),
+            ("Sound Channels", "Low (ลดภาระ CPU ด้านเสียงตอนมอนเยอะ)"),
+            ("Mute BG Sounds", "ปิดเสียงเพลง/รอบข้างใน config (เซฟ CPU มหาศาล)"),
+            ("Multithreading", "เปิดใช้งาน (เพื่อดึงพลัง CPU ออกมาทุกคอร์)"),
         ]:
             self._tip_row(content, s, d)
 
