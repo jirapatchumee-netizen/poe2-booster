@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POE2 Booster — Fix Frame Drops in Path of Exile 2</title>
+    <meta name="description" content="Free one-click shader cache clearing overlay for Path of Exile 2. Fix frame drops and monitor your system without leaving the game.">
+    <meta name="keywords" content="POE2, Path of Exile 2, FPS fix, frame drop, performance, booster, overlay, shader cache">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0e17;
+            --bg-card: #111827;
+            --bg-card-hover: #1a2332;
+            --accent: #58a6ff;
+            --accent-dim: #1f6feb;
+            --purple: #7c3aed;
+            --purple-dim: #6d28d9;
+            --success: #3fb950;
+            --warning: #d29922;
+            --text: #e6edf3;
+            --text-dim: #8b949e;
+            --border: #21262d;
+            --glow: rgba(88, 166, 255, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ─── Animated Background ─── */
+        .bg-gradient {
+            position: fixed; inset: 0; z-index: -1;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(88,166,255,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(124,58,237,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(31,111,235,0.05) 0%, transparent 50%);
+        }
+
+        /* ─── Navbar ─── */
+        nav {
+            position: fixed; top: 0; width: 100%; z-index: 100;
+            background: rgba(10,14,23,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+        }
+        .nav-inner {
+            max-width: 1100px; margin: 0 auto;
+            display: flex; align-items: center; justify-content: space-between;
+            height: 60px;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .nav-logo img { width: 28px; height: 28px; border-radius: 6px; }
+        .nav-logo span { font-weight: 700; font-size: 1.05rem; color: var(--text); }
+        .nav-links { display: flex; gap: 28px; list-style: none; }
+        .nav-links a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--text); }
+        .nav-cta {
+            background: var(--accent-dim); color: #fff; padding: 8px 20px;
+            border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;
+            transition: background 0.2s, transform 0.2s;
+        }
+        .nav-cta:hover { background: var(--accent); transform: translateY(-1px); }
+
+        /* ─── Hero ─── */
+        .hero {
+            min-height: 90vh; display: flex; align-items: center; justify-content: center;
+            text-align: center; padding: 120px 1.5rem 80px;
+        }
+        .hero-content { max-width: 720px; }
+        .hero-badge {
+            display: inline-block; background: rgba(124,58,237,0.15); color: var(--purple);
+            padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+            border: 1px solid rgba(124,58,237,0.3); margin-bottom: 24px;
+        }
+        .hero h1 {
+            font-size: clamp(2.2rem, 5vw, 3.5rem); font-weight: 800;
+            line-height: 1.15; margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .hero p { font-size: 1.15rem; color: var(--text-dim); max-width: 560px; margin: 0 auto 32px; }
+        .hero-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            padding: 14px 32px; border-radius: 10px; font-weight: 600;
+            font-size: 1rem; text-decoration: none; transition: all 0.25s; display: inline-flex;
+            align-items: center; gap: 8px; border: none; cursor: pointer;
+        }
+        .btn-primary { background: var(--accent-dim); color: #fff; }
+        .btn-primary:hover { background: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(88,166,255,0.25); }
+        .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--purple); color: var(--purple); transform: translateY(-2px); }
+        .hero-stats {
+            display: flex; gap: 40px; justify-content: center; margin-top: 48px;
+            flex-wrap: wrap;
+        }
+        .hero-stat { text-align: center; }
+        .hero-stat-num { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+        .hero-stat-label { font-size: 0.85rem; color: var(--text-dim); }
+
+        /* ─── Section ─── */
+        section { padding: 80px 1.5rem; }
+        .section-inner { max-width: 1100px; margin: 0 auto; }
+        .section-title {
+            text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 12px;
+        }
+        .section-sub {
+            text-align: center; color: var(--text-dim); max-width: 560px;
+            margin: 0 auto 48px; font-size: 1.05rem;
+        }
+
+        /* ─── Features Grid ─── */
+        .features-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .feature-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 28px; transition: all 0.3s;
+            opacity: 0; transform: translateY(20px);
+        }
+        .feature-card.visible { opacity: 1; transform: translateY(0); }
+        .feature-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 12px 40px var(--glow); }
+        .feature-icon { font-size: 2rem; margin-bottom: 14px; display: block; }
+        .feature-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+        .feature-card p { color: var(--text-dim); font-size: 0.92rem; line-height: 1.6; }
+
+        /* ─── Steps ─── */
+        .steps { display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; }
+        .step {
+            flex: 1; min-width: 260px; max-width: 320px; text-align: center;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 32px 24px; position: relative;
+        }
+        .step-num {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--accent-dim); color: #fff; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px; font-size: 1.1rem;
+        }
+        .step h3 { font-size: 1.05rem; margin-bottom: 8px; }
+        .step p { color: var(--text-dim); font-size: 0.9rem; }
+
+        /* ─── FAQ ─── */
+        .faq-list { max-width: 700px; margin: 0 auto; }
+        .faq-item {
+            border-bottom: 1px solid var(--border); overflow: hidden;
+        }
+        .faq-question {
+            width: 100%; background: none; border: none; color: var(--text);
+            font-size: 1rem; font-weight: 500; padding: 20px 0; text-align: left;
+            cursor: pointer; display: flex; justify-content: space-between;
+            align-items: center; font-family: inherit;
+        }
+        .faq-question::after { content: "+"; font-size: 1.3rem; color: var(--text-dim); transition: transform 0.3s; }
+        .faq-item.open .faq-question::after { transform: rotate(45deg); }
+        .faq-answer {
+            max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+            color: var(--text-dim); font-size: 0.92rem; line-height: 1.7;
+        }
+        .faq-item.open .faq-answer { max-height: 200px; padding-bottom: 20px; }
+
+        /* ─── Footer ─── */
+        footer {
+            border-top: 1px solid var(--border); padding: 40px 1.5rem;
+            text-align: center; color: var(--text-dim); font-size: 0.85rem;
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero h1 { font-size: 2rem; }
+            .hero-stats { gap: 24px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .steps { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+
+    <!-- Nav -->
+    <nav>
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <img src="logo.png" alt="POE2 Booster">
+                <span>POE2 Booster</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#how">How It Works</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+            <a href="#download" class="nav-cta">⚡ Download Free</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <span class="hero-badge">⚡ 100% Free & Open-Source</span>
+            <h1>Fix Frame Drops in Path of Exile 2</h1>
+            <p>One-click in-game overlay that immediately clears bloated DirectX, NVIDIA, and AMD shader caches to solve stuttering and restore your FPS instantly.</p>
+            <div class="hero-buttons">
+                <a href="#download" class="btn btn-primary">⬇ Download Free (Installer)</a>
+                <a href="https://github.com/poe2booster/poe2-booster" class="btn btn-secondary">💻 View on GitHub</a>
+            </div>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-num">25GB+</div>
+                    <div class="hero-stat-label">Avg. cache cleaned</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-num">100%</div>
+                    <div class="hero-stat-label">Free & Safe</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-num">19MB</div>
+                    <div class="hero-stat-label">Lightweight standalone .exe</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features">
+        <div class="section-inner">
+            <h2 class="section-title">Minimalist & Powerful</h2>
+            <p class="section-sub">Zero bloat. Built specifically to tackle the #1 cause of POE2 performance degradation.</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🗑️</span>
+                    <h3>One-Click Cache Clear</h3>
+                    <p>Click the "Boost" button to immediately wipe out bloated shader caches from DirectX, NVIDIA, and AMD without closing your game.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>Real-Time Monitor</h3>
+                    <p>Track your CPU, RAM, and GPU Temperature live on a compact, non-intrusive overlay bar that floats over the game.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">⌨️</span>
+                    <h3>In-Game Toggle (F4)</h3>
+                    <p>Toggle the visibility of the overlay bar instantly in-game by pressing F4. Hide it during intense combat and show it when needed.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">👋</span>
+                    <h3>Smart First-Time Setup</h3>
+                    <p>Runs a quick scan on first launch to detect accumulated cache size and clears gigabytes of bloat in a single click.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how" style="background: rgba(17,24,39,0.5);">
+        <div class="section-inner">
+            <h2 class="section-title">Up and Running in 30 Seconds</h2>
+            <p class="section-sub">No Python needed. Standalone installer makes it plug-and-play.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <h3>Download & Install</h3>
+                    <p>Run the modern setup installer. Creates a shortcut and sets up autostart in one click.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <h3>Launch & Play</h3>
+                    <p>Open Path of Exile 2 in Borderless Windowed mode. The minimalist bar will float at the top of your screen.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <h3>Press F4 & Boost</h3>
+                    <p>Hit "🚀 Boost" to clear the cache instantly when you feel a frame drop. Use F4 to toggle the bar visibility.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+        <div class="section-inner">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <p class="section-sub">Got questions? We've got answers.</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question">Is POE2 Booster safe to use?</button>
+                    <div class="faq-answer">Yes! POE2 Booster only deletes temporary shader cache folders (DirectX, NVIDIA, AMD) and displays system stats. It never reads game memory, injects code, or modifies game files. It is 100% safe.</div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">Will I get banned for using this?</button>
+                    <div class="faq-answer">No. POE2 Booster does not interact with the game client or server. It is the equivalent of manually cleaning your local graphics cache folder, which is safe and recommended by GGG developers to fix stuttering.</div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">Do I need to install Python?</button>
+                    <div class="faq-answer">No! The production version is compiled into a single standalone `.exe` using PyInstaller. Just run the installer and it will work out of the box on any Windows 10/11 system.</div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">Why does POE2 frame rate drop after playing for a while?</button>
+                    <div class="faq-answer">Path of Exile 2 generates massive amounts of shader caches as you visit new areas and combat new monsters. When these caches become too large or fragmented, the graphics driver stutters when accessing them. Clearing them restores smooth shader compilation.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download CTA -->
+    <section id="download" style="background: rgba(17,24,39,0.5);">
+        <div class="section-inner" style="text-align: center;">
+            <h2 class="section-title">Ready to Restore Your FPS?</h2>
+            <p class="section-sub">Join thousands of exile players enjoying stable, stutter-free gameplay.</p>
+            <a href="#" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 40px;">⚡ Download POE2 Booster (Free)</a>
+            <p style="color: var(--text-dim); font-size: 0.85rem; margin-top: 16px;">Windows 10/11 • 19MB Standalone Installer • 100% Free</p>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 POE2 Booster. Not affiliated with Grinding Gear Games.</p>
+    </footer>
+
+    <script>
+        // Scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.feature-card').forEach(el => observer.observe(el));
+
+        // FAQ accordion
+        document.querySelectorAll('.faq-question').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const item = btn.parentElement;
+                document.querySelectorAll('.faq-item').forEach(i => {
+                    if (i !== item) i.classList.remove('open');
+                });
+                item.classList.toggle('open');
+            });
+        });
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', e => {
+                e.preventDefault();
+                const target = document.querySelector(a.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+    </script>
+</body>
+</html>
