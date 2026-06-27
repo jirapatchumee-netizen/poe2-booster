@@ -67,6 +67,11 @@ SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
 
 
+def _is_frozen():
+    """Check if running as compiled .exe (PyInstaller or Nuitka)"""
+    return getattr(sys, "frozen", False) or "__compiled__" in dir()
+
+
 class POE2BoosterApp:
     def __init__(self):
         self.bar_visible = True
@@ -502,7 +507,7 @@ class POE2BoosterApp:
             return
 
         c = config.COLORS
-        is_frozen = getattr(sys, "frozen", False)
+        is_frozen = _is_frozen()
 
         # Show starting message on the bar
         self._show_boost_result(f"⬆ พบ {version} — กำลังดาวน์โหลดอัปเดตอัตโนมัติ...", c["accent"])
@@ -991,43 +996,21 @@ class POE2BoosterApp:
             btn_opt.bind("<Enter>", lambda e: btn_opt.config(bg=c["accent"]))
             btn_opt.bind("<Leave>", lambda e: btn_opt.config(bg=c["accent_dim"]))
 
-    # ── TAB 3: PRO FEATURES (THEMES & AUTO-BOOST) ────────
-    def _render_pro_settings_tab(self):
+    # ── TAB 3: ตั้งค่าขั้นสูง (THEMES & AUTO-BOOST) ────────
+    def _render_advanced_settings_tab(self):
         c = config.COLORS
         win = self._dash_win
 
         # Title
         hdr = tk.Frame(self.dash_content, bg=c["panel_bg"])
         hdr.pack(fill="x", pady=(0, 10))
-        tk.Label(hdr, text="💎  ฟีเจอร์ระดับ PRO", font=("Segoe UI Semibold", 13), bg=c["panel_bg"], fg=c["text"]).pack(side="left")
+        tk.Label(hdr, text="⚙️  ตั้งค่าขั้นสูง", font=("Segoe UI Semibold", 13), bg=c["panel_bg"], fg=c["text"]).pack(side="left")
         
         close = tk.Label(hdr, text="✕", font=("Segoe UI", 12, "bold"), bg=c["panel_bg"], fg=c["text_dim"], cursor="hand2")
         close.pack(side="right")
         close.bind("<Button-1>", lambda e: win.destroy())
 
-        # If not Pro, show block overlay
-        if not config.IS_PRO:
-            lock_f = tk.Frame(self.dash_content, bg=c["card"], padx=20, pady=24)
-            lock_f.pack(fill="both", expand=True, pady=10)
-            lock_f.config(highlightbackground=c["border"], highlightthickness=1)
-            
-            tk.Label(lock_f, text="🔒 ฟีเจอร์นี้เฉพาะสมาชิกระดับ PRO เท่านั้น", font=("Segoe UI Semibold", 12), bg=c["card"], fg=c["pro_badge"]).pack(pady=(10, 8))
-            tk.Label(lock_f, text="ปลดล็อกสุดยอดฟีเจอร์ช่วยให้การเล่นเกมสมบูรณ์แบบที่สุด:\n\n"
-                                  "• 🔄 Auto-Boost: ไม่ต้องกดบูสต์เอง แอปสแกนและรันคำสั่งเมื่อเปิดเกมทันที\n"
-                                  "• 🎬 OBS Streamer Mode: ซ่อนแถบ Overlay ทั้งหมดไม่ให้ผู้ชมในสตรีมเห็น\n"
-                                  "• 🌐 Real-time Ping: ติดตามค่าความหน่วงสัญญาณเน็ตได้ตลอดเวลา\n"
-                                  "• ⏰ Smart Auto-Clean: ป้องกันเกมสะดุดจากการลืมล้างไฟล์แคชสะสม\n"
-                                  "• 🎨 Custom Themes: ปรับแต่งโทนสี Overlay ได้ตามสไตล์ที่คุณชอบ",
-                     font=("Segoe UI", 10), bg=c["card"], fg=c["text_dim"], justify="left", wraplength=440).pack(pady=8)
-            
-            btn_act = tk.Label(lock_f, text="🔑  ไปที่หน้าใส่คีย์ใช้งาน", font=("Segoe UI Semibold", 10), bg=c["accent_dim"], fg="#fff", padx=16, pady=8, cursor="hand2")
-            btn_act.pack(pady=12)
-            btn_act.bind("<Button-1>", lambda e: self._switch_dash_tab("activation"))
-            btn_act.bind("<Enter>", lambda e: btn_act.config(bg=c["accent"]))
-            btn_act.bind("<Leave>", lambda e: btn_act.config(bg=c["accent_dim"]))
-            return
-
-        # Render Pro settings controls
+        # Render settings controls
         f_options = tk.Frame(self.dash_content, bg=c["panel_bg"])
         f_options.pack(fill="both", expand=True)
 
@@ -1047,7 +1030,7 @@ class POE2BoosterApp:
             elif key == "streamer_mode":
                 self.pro_streamer_mode = not self.pro_streamer_mode
             save_pro_settings()
-            self._switch_dash_tab("pro_settings")  # Redraw tab to reflect checkbox states
+            self._switch_dash_tab("advanced")  # Redraw tab to reflect checkbox states
 
         # 1. Option Auto Boost
         f_ab = tk.Frame(f_options, bg=c["card"], padx=12, pady=10)
@@ -1100,7 +1083,7 @@ class POE2BoosterApp:
             config.switch_theme(t_name)
             self._apply_streamer_mode()
             self._refresh_theme()
-            self._switch_dash_tab("pro_settings")  # Redraw tab with new colors!
+            self._switch_dash_tab("advanced")  # Redraw tab with new colors!
 
         for t_key, t_title, t_hex in theme_list:
             btn_t = tk.Label(
@@ -1112,107 +1095,7 @@ class POE2BoosterApp:
             btn_t.bind("<Button-1>", lambda e, k=t_key: do_theme_change(k))
             btn_t.config(highlightbackground=t_hex, highlightthickness=1)
 
-    # ── TAB 4: ACTIVATION (LICENSE VERIFICATION) ────────
-    def _render_activation_tab(self):
-        c = config.COLORS
-        win = self._dash_win
 
-        # Title
-        hdr = tk.Frame(self.dash_content, bg=c["panel_bg"])
-        hdr.pack(fill="x", pady=(0, 10))
-        tk.Label(hdr, text="🔑  เปิดใช้งานคีย์สมาชิกระดับ PRO", font=("Segoe UI Semibold", 13), bg=c["panel_bg"], fg=c["text"]).pack(side="left")
-        
-        close = tk.Label(hdr, text="✕", font=("Segoe UI", 12, "bold"), bg=c["panel_bg"], fg=c["text_dim"], cursor="hand2")
-        close.pack(side="right")
-        close.bind("<Button-1>", lambda e: win.destroy())
-
-        act_f = tk.Frame(self.dash_content, bg=c["card"], padx=16, pady=16)
-        act_f.pack(fill="both", expand=True, pady=10)
-        act_f.config(highlightbackground=c["border"], highlightthickness=1)
-
-        status_txt = "สมาชิกระดับ PRO: เปิดใช้งานแล้ว ✅" if config.IS_PRO else "สมาชิกระดับ PRO: ยังไม่ได้เปิดใช้งาน ❌"
-        status_col = c["success"] if config.IS_PRO else c["text_dim"]
-
-        tk.Label(act_f, text=status_txt, font=("Segoe UI Semibold", 11), bg=c["card"], fg=status_col).pack(pady=(5, 12))
-
-        # Enter key label
-        tk.Label(act_f, text="ระบุ License Key ของคุณด้านล่าง:", font=("Segoe UI", 9), bg=c["card"], fg=c["text"]).pack(anchor="w", padx=12)
-
-        # Key Input
-        entry_f = tk.Frame(act_f, bg=c["card"], pady=6)
-        entry_f.pack(fill="x", padx=12)
-        
-        key_entry = tk.Entry(
-            entry_f, font=("Consolas", 11),
-            bg=c["panel_bg"], fg=c["text"],
-            insertbackground=c["text"], relief="flat",
-            highlightthickness=1, highlightbackground=c["border"],
-            highlightcolor=c["accent"]
-        )
-        key_entry.pack(fill="x", ipady=4)
-        
-        if config.IS_PRO and config.LICENSE_KEY:
-            # Mask the license key for display security
-            masked = config.LICENSE_KEY[:9] + "XXXX-XXXX-XXXX"
-            key_entry.insert(0, masked)
-            key_entry.config(state="disabled")
-
-        # Action Buttons
-        btn_action_f = tk.Frame(act_f, bg=c["card"], pady=8)
-        btn_action_f.pack(fill="x", padx=12)
-
-        msg_lbl = tk.Label(act_f, text="", font=("Segoe UI", 9), bg=c["card"])
-        msg_lbl.pack(pady=4)
-
-        def do_activate():
-            key = key_entry.get().strip()
-            if not key:
-                msg_lbl.config(text="❌ กรุณาระบุคีย์ของท่าน", fg=c["danger"])
-                return
-            
-            if config.verify_license(key):
-                config.save_config_file(license_key=key)
-                self._apply_streamer_mode()
-                self._refresh_theme()
-                self._switch_dash_tab("activation")
-                msg_lbl.config(text="✅ ปลดล็อกระดับ PRO สำเร็จแล้ว! ขอบพระคุณที่สนับสนุนเราครับ", fg=c["success"])
-            else:
-                msg_lbl.config(text="❌ คีย์สมาชิกระดับ PRO ไม่ถูกต้องตามเงื่อนไข", fg=c["danger"])
-
-        def do_deactivate():
-            config.save_config_file(license_key="")
-            # Set local settings to False
-            self.pro_auto_boost = False
-            self.pro_auto_clean = False
-            self.pro_streamer_mode = False
-            config.save_config_file(auto_boost=False, auto_clean=False, streamer_mode=False)
-            self._apply_streamer_mode()
-            self._refresh_theme()
-            self._switch_dash_tab("activation")
-            msg_lbl.config(text="⏩ คืนสิทธิ์การเข้าถึงเป็นระดับใช้งานปกติเรียบร้อยแล้ว", fg=c["accent"])
-
-        if config.IS_PRO:
-            deact_btn = tk.Label(btn_action_f, text="❌  ยกเลิกการล็อกอินคีย์นี้", font=("Segoe UI Semibold", 10), bg=c["border"], fg=c["danger"], padx=16, pady=8, cursor="hand2")
-            deact_btn.pack(side="left")
-            deact_btn.bind("<Button-1>", lambda e: do_deactivate())
-        else:
-            act_btn = tk.Label(btn_action_f, text="🔑  เปิดใช้งาน PRO", font=("Segoe UI Semibold", 10), bg=c["accent_dim"], fg="#fff", padx=16, pady=8, cursor="hand2")
-            act_btn.pack(side="left", padx=(0, 10))
-            act_btn.bind("<Button-1>", lambda e: do_activate())
-            act_btn.bind("<Enter>", lambda e: act_btn.config(bg=c["accent"]))
-            act_btn.bind("<Leave>", lambda e: act_btn.config(bg=c["accent_dim"]))
-
-            # Purchase Key Link
-            def open_buy():
-                try:
-                    import webbrowser
-                    webbrowser.open(config.APP_WEBSITE)
-                except Exception:
-                    pass
-
-            buy_lbl = tk.Label(btn_action_f, text="🛒 ยังไม่มีคีย์? ซื้อใช้งานได้ที่นี่ →", font=("Segoe UI", 9, "underline"), bg=c["card"], fg=c["accent"], cursor="hand2")
-            buy_lbl.pack(side="right", pady=8)
-            buy_lbl.bind("<Button-1>", lambda e: open_buy())
 
     # ══════════════════════════════════════════════════════
     #   AUTO-UPDATE (with silent auto-update via Boost)
@@ -1274,7 +1157,7 @@ class POE2BoosterApp:
         size_mb = info.get("size", 0) / (1024 * 1024)
         notes = info.get("notes", "") or "ไม่มีรายละเอียดเพิ่มเติม"
         download_url = info.get("download_url", "")
-        is_frozen = getattr(sys, "frozen", False)
+        is_frozen = _is_frozen()
 
         # Create dialog window
         win = tk.Toplevel(self.root)

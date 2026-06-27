@@ -77,7 +77,7 @@ def download_to_temp(download_url, callback=None):
     Works in both frozen and non-frozen modes.
     """
     try:
-        if getattr(sys, "frozen", False):
+        if getattr(sys, "frozen", False) or "__compiled__" in dir():
             dest_dir = os.path.dirname(sys.executable)
             exe_name = os.path.basename(sys.executable)
             dest_path = os.path.join(dest_dir, f"_update_{exe_name}")
@@ -124,7 +124,7 @@ def apply_update_and_restart(temp_exe_path, callback=None):
     Only works when running as frozen .exe.
     Returns True if the restart was initiated.
     """
-    if not getattr(sys, "frozen", False):
+    if not (getattr(sys, "frozen", False) or "__compiled__" in dir()):
         if callback:
             callback("error", "Auto-restart ใช้ได้เฉพาะไฟล์ .exe เท่านั้น")
         return False
@@ -217,20 +217,3 @@ del "%~f0" 2>nul
             callback("error", f"รีสตาร์ทล้มเหลว: {e}")
         return False
 
-
-# ── Legacy function (kept for backward compatibility) ──
-def download_and_replace(download_url, callback=None):
-    """
-    Download new .exe and create a batch script to replace the current one.
-    Returns True if the batch script was launched (app should exit after).
-    """
-    if not getattr(sys, "frozen", False):
-        if callback:
-            callback("error", "Auto-update ใช้ได้เฉพาะในโหมด .exe เท่านั้น")
-        return False
-
-    temp_path = download_to_temp(download_url, callback=callback)
-    if not temp_path:
-        return False
-
-    return apply_update_and_restart(temp_path, callback=callback)

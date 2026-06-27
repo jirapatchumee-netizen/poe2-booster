@@ -37,14 +37,13 @@ class SetupWizard:
         sh = self.window.winfo_screenheight()
         self.window.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
 
-        # Streamer mode protection if enabled (though first run usually not enabled yet)
-        if config.IS_PRO:
-            try:
-                self.window.update_idletasks()
-                hwnd = int(self.window.wm_frame(), 16)
-                ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0x00000011)
-            except Exception:
-                pass
+        # Streamer mode protection
+        try:
+            self.window.update_idletasks()
+            hwnd = int(self.window.wm_frame(), 16)
+            ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0x00000011)
+        except Exception:
+            pass
 
         # Border
         border = tk.Frame(self.window, bg=c["border"], padx=1, pady=1)
