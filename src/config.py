@@ -8,7 +8,7 @@ import os
 import json
 
 APP_NAME = "POE2 Booster"
-APP_VERSION = "1.4.1"  # ปลดล็อกฟีเจอร์ทั้งหมดให้ใช้ฟรี
+APP_VERSION = "1.4.2"  # ปลดล็อกฟีเจอร์ทั้งหมดให้ใช้ฟรี
 APP_AUTHOR = "POE2 Booster Team"
 APP_WEBSITE = "https://poe2booster.com"
 HOTKEY = "F4"
@@ -16,6 +16,8 @@ HOTKEY = "F4"
 # สถานะ Pro — เปิดถาวร (ฟีเจอร์ทุกตัวปลดล็อกแล้ว)
 IS_PRO = True
 CURRENT_THEME = "blue"
+POESESSID = ""
+ACCOUNT_NAME = ""
 
 # ── Themes Palette ───────────────────────────────────────
 THEMES = {
@@ -100,7 +102,7 @@ def get_config_path():
 
 def load_config():
     """โหลดการตั้งค่าจากไฟล์ config"""
-    global CURRENT_THEME, COLORS
+    global CURRENT_THEME, COLORS, POESESSID, ACCOUNT_NAME
     path = get_config_path()
     if os.path.exists(path):
         try:
@@ -112,15 +114,17 @@ def load_config():
                 CURRENT_THEME = theme
                 COLORS = THEMES[theme]
 
+            POESESSID = data.get("poesessid", "")
+            ACCOUNT_NAME = data.get("account_name", "")
             return data
         except Exception:
             pass
     return {}
 
 
-def save_config_file(theme=None, auto_start=None, first_run_complete=True, **kwargs):
+def save_config_file(theme=None, auto_start=None, first_run_complete=True, poesessid=None, account_name=None, **kwargs):
     """บันทึกการตั้งค่าลงไฟล์ config"""
-    global CURRENT_THEME, COLORS
+    global CURRENT_THEME, COLORS, POESESSID, ACCOUNT_NAME
 
     path = get_config_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -139,6 +143,14 @@ def save_config_file(theme=None, auto_start=None, first_run_complete=True, **kwa
             data["theme"] = theme
             CURRENT_THEME = theme
             COLORS = THEMES[theme]
+
+    if poesessid is not None:
+        data["poesessid"] = poesessid
+        POESESSID = poesessid
+
+    if account_name is not None:
+        data["account_name"] = account_name
+        ACCOUNT_NAME = account_name
 
     if auto_start is not None:
         data["auto_start"] = auto_start

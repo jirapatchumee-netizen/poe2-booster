@@ -1095,6 +1095,80 @@ class POE2BoosterApp:
             btn_t.bind("<Button-1>", lambda e, k=t_key: do_theme_change(k))
             btn_t.config(highlightbackground=t_hex, highlightthickness=1)
 
+        # 5. PoE Account Settings (POESESSID & Account Name)
+        f_acc = tk.Frame(f_options, bg=c["card"], padx=12, pady=12)
+        f_acc.pack(fill="x", pady=10)
+        f_acc.config(highlightbackground=c["border"], highlightthickness=1)
+        tk.Label(f_acc, text="🔑  ข้อมูลบัญชี PoE (สำหรับสแกนราคาคลังเก็บของ):", font=("Segoe UI Semibold", 9), bg=c["card"], fg=c["text"]).pack(anchor="w", pady=(0, 6))
+
+        # Account Name row
+        f_name_row = tk.Frame(f_acc, bg=c["card"])
+        f_name_row.pack(fill="x", pady=2)
+        tk.Label(f_name_row, text="Account Name:", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"], width=13, anchor="e").pack(side="left")
+        
+        acc_entry = tk.Entry(
+            f_name_row, font=("Segoe UI", 9),
+            bg=c["panel_bg"], fg=c["text"],
+            insertbackground=c["text"], relief="flat",
+            highlightthickness=1, highlightbackground=c["border"],
+            highlightcolor=c["accent"]
+        )
+        acc_entry.pack(side="left", fill="x", expand=True, padx=(8, 0), ipady=2)
+        acc_entry.insert(0, config.ACCOUNT_NAME)
+
+        # POESESSID row
+        f_sess_row = tk.Frame(f_acc, bg=c["card"])
+        f_sess_row.pack(fill="x", pady=4)
+        tk.Label(f_sess_row, text="POESESSID:", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"], width=13, anchor="e").pack(side="left")
+        
+        sess_entry = tk.Entry(
+            f_sess_row, font=("Segoe UI", 9),
+            bg=c["panel_bg"], fg=c["text"],
+            insertbackground=c["text"], relief="flat",
+            highlightthickness=1, highlightbackground=c["border"],
+            highlightcolor=c["accent"], show="*"
+        )
+        sess_entry.pack(side="left", fill="x", expand=True, padx=(8, 0), ipady=2)
+        sess_entry.insert(0, config.POESESSID)
+
+        # Show/Hide cookie toggle
+        def toggle_show_cookie():
+            if sess_entry.cget("show") == "*":
+                sess_entry.config(show="")
+                show_btn.config(text="🙈 ซ่อน")
+            else:
+                sess_entry.config(show="*")
+                show_btn.config(text="👁️ แสดง")
+
+        show_btn = tk.Label(f_sess_row, text="👁️ แสดง", font=("Segoe UI", 8), bg=c["border"], fg=c["text"], padx=8, pady=2, cursor="hand2")
+        show_btn.pack(side="left", padx=(6, 0))
+        show_btn.bind("<Button-1>", lambda e: toggle_show_cookie())
+        show_btn.bind("<Enter>", lambda e: show_btn.config(bg=c["card_hover"]))
+        show_btn.bind("<Leave>", lambda e: show_btn.config(bg=c["border"]))
+
+        # Action Buttons for PoE Account
+        f_acc_btns = tk.Frame(f_acc, bg=c["card"])
+        f_acc_btns.pack(fill="x", pady=(6, 0))
+
+        # Save Button
+        save_acc_b = tk.Label(f_acc_btns, text="💾 บันทึกข้อมูลบัญชี", font=("Segoe UI Semibold", 9), bg=c["accent_dim"], fg="#fff", padx=12, pady=4, cursor="hand2")
+        save_acc_b.pack(side="left")
+
+        # Status/Helper label
+        acc_status = tk.Label(f_acc_btns, text="คุกกี้ Session ID ใช้ดึงข้อมูล Stash API อย่างปลอดภัย", font=("Segoe UI", 8), bg=c["card"], fg=c["text_dim"])
+        acc_status.pack(side="left", padx=10)
+
+        def save_account_data(e):
+            name_val = acc_entry.get().strip()
+            sess_val = sess_entry.get().strip()
+            config.save_config_file(account_name=name_val, poesessid=sess_val)
+            acc_status.config(text="✅ บันทึกข้อมูลเรียบร้อย!", fg=c["success"])
+            self.root.after(3000, lambda: acc_status.config(text="คุกกี้ Session ID ใช้ดึงข้อมูล Stash API อย่างปลอดภัย", fg=c["text_dim"]))
+
+        save_acc_b.bind("<Button-1>", save_account_data)
+        save_acc_b.bind("<Enter>", lambda e: save_acc_b.config(bg=c["accent"]))
+        save_acc_b.bind("<Leave>", lambda e: save_acc_b.config(bg=c["accent_dim"]))
+
 
 
     # ══════════════════════════════════════════════════════

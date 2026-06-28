@@ -23,3 +23,11 @@ Thumbs.db
 # Update temp files
 _update_*.exe
 _poe2booster_update.bat
+
+# Temp research/debug files
+temp_*/
+
+# Nuitka build artifacts
+*.build/
+*.dist/
+*.onefile-build/
