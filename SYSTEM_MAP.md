@@ -15,6 +15,8 @@ poe2-booster/
 │   ├── config.py            # การตั้งค่าระบบ, ธีมสี, และ Metadata
 │   ├── booster.py           # ลอจิกการทำ Optimization และเขียน Config เกม
 │   ├── main.py              # หน้ากากโปรแกรม (GUI) หลักและบริการพื้นหลัง
+│   ├── stash.py             # ดึงข้อมูลคลังไอเทมจาก official PoE API (POESESSID)
+│   ├── pricer.py            # ดึงราคาตลาดจาก poe.ninja API และคำนวณประเมินมูลค่า
 │   ├── updater.py           # ระบบเช็คเวอร์ชันดาวน์โหลดและติดตั้งตัวอัปเดต
 │   └── wizard.py            # Setup Wizard รันเฉพาะเมื่อเปิดโปรแกรมครั้งแรก
 ├── dist/                    # โฟลเดอร์ที่เก็บไฟล์ .exe หลัง Compile
