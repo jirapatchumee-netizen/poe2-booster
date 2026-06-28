@@ -641,7 +641,7 @@ class POE2BoosterApp:
         win.attributes("-alpha", 0.96)
         win.configure(bg=c["panel_bg"])
 
-        w, h = 680, 460
+        w, h = 700, 560
         sw = win.winfo_screenwidth()
         sh = win.winfo_screenheight()
         win.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")

@@ -8,7 +8,7 @@ import os
 import json
 
 APP_NAME = "POE2 Booster"
-APP_VERSION = "1.4.2"  # ปลดล็อกฟีเจอร์ทั้งหมดให้ใช้ฟรี
+APP_VERSION = "1.4.3"  # ปลดล็อกฟีเจอร์ทั้งหมดให้ใช้ฟรี
 APP_AUTHOR = "POE2 Booster Team"
 APP_WEBSITE = "https://poe2booster.com"
 HOTKEY = "F4"
