@@ -36,6 +36,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 import booster
 import updater
+import stash
+import pricer
 from wizard import SetupWizard, is_first_run
 
 try:
@@ -670,6 +672,7 @@ class POE2BoosterApp:
         nav_items = [
             ("status", "📊  สถานะระบบ"),
             ("optimizer", "🎮  ปรับแต่งเกม"),
+            ("stash", "💰  เช็คราคาคลัง"),
             ("advanced", "⚙️  ตั้งค่าขั้นสูง"),
         ]
 
@@ -727,6 +730,8 @@ class POE2BoosterApp:
             self._render_status_tab()
         elif target_tab == "optimizer":
             self._render_optimizer_tab()
+        elif target_tab == "stash":
+            self._render_stash_tab()
         elif target_tab == "advanced":
             self._render_advanced_settings_tab()
         elif target_tab == "settings":
@@ -996,7 +1001,177 @@ class POE2BoosterApp:
             btn_opt.bind("<Enter>", lambda e: btn_opt.config(bg=c["accent"]))
             btn_opt.bind("<Leave>", lambda e: btn_opt.config(bg=c["accent_dim"]))
 
-    # ── TAB 3: ตั้งค่าขั้นสูง (THEMES & AUTO-BOOST) ────────
+    # ── TAB 3: เช็คราคาคลังเก็บของ (STASH VALUATION) ────────
+    def _render_stash_tab(self):
+        c = config.COLORS
+        win = self._dash_win
+
+        # Title
+        hdr = tk.Frame(self.dash_content, bg=c["panel_bg"])
+        hdr.pack(fill="x", pady=(0, 6))
+        tk.Label(hdr, text="💰  ประเมินราคาคลังเก็บของ (Stash Price)", font=("Segoe UI Semibold", 13), bg=c["panel_bg"], fg=c["text"]).pack(side="left")
+        
+        close = tk.Label(hdr, text="✕", font=("Segoe UI", 12, "bold"), bg=c["panel_bg"], fg=c["text_dim"], cursor="hand2")
+        close.pack(side="right")
+        close.bind("<Button-1>", lambda e: win.destroy())
+
+        # Top Control Bar (League & Tab Selection & Scan Button)
+        ctrl_card = tk.Frame(self.dash_content, bg=c["card"], padx=12, pady=10)
+        ctrl_card.pack(fill="x", pady=(0, 8))
+        ctrl_card.config(highlightbackground=c["border"], highlightthickness=1)
+
+        tk.Label(ctrl_card, text="League:", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"]).pack(side="left", padx=(0, 4))
+        league_entry = tk.Entry(ctrl_card, font=("Segoe UI", 9), bg=c["panel_bg"], fg=c["text"], insertbackground=c["text"], relief="flat", width=12, highlightthickness=1, highlightbackground=c["border"])
+        league_entry.pack(side="left", padx=(0, 12), ipady=2)
+        league_entry.insert(0, getattr(self, "_stash_league", "Standard"))
+
+        tk.Label(ctrl_card, text="Tab Index:", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"]).pack(side="left", padx=(0, 4))
+        tab_entry = tk.Entry(ctrl_card, font=("Segoe UI", 9), bg=c["panel_bg"], fg=c["text"], insertbackground=c["text"], relief="flat", width=5, highlightthickness=1, highlightbackground=c["border"])
+        tab_entry.pack(side="left", padx=(0, 12), ipady=2)
+        tab_entry.insert(0, str(getattr(self, "_stash_tab_idx", 0)))
+
+        scan_btn = tk.Label(ctrl_card, text="🔍 สแกนและประเมินราคา", font=("Segoe UI Semibold", 9), bg=c["accent_dim"], fg="#fff", padx=14, pady=4, cursor="hand2")
+        scan_btn.pack(side="left")
+
+        # Container for results
+        results_frame = tk.Frame(self.dash_content, bg=c["panel_bg"])
+        results_frame.pack(fill="both", expand=True)
+
+        def render_valuation_results(data_res):
+            for w in results_frame.winfo_children():
+                w.destroy()
+
+            if not data_res.get("success"):
+                err_card = tk.Frame(results_frame, bg=c["card"], padx=16, pady=16)
+                err_card.pack(fill="x", pady=10)
+                err_card.config(highlightbackground=c["danger"], highlightthickness=1)
+                tk.Label(err_card, text="❌ เกิดข้อผิดพลาด", font=("Segoe UI Semibold", 11), bg=c["card"], fg=c["danger"]).pack(anchor="w")
+                tk.Label(err_card, text=data_res.get("error", "ไม่สามารถดึงข้อมูลได้"), font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"], wraplength=480, justify="left").pack(anchor="w", pady=(4, 0))
+                return
+
+            val = data_res["valuation"]
+            total_chaos = val["total_chaos"]
+            total_divine = val["total_divine"]
+            div_price = val["divine_price"]
+            items = val["valuable_items"]
+
+            # Summary Bento Grid (Top Row)
+            sum_grid = tk.Frame(results_frame, bg=c["panel_bg"])
+            sum_grid.pack(fill="x", pady=(0, 8))
+
+            # Box 1: Total Valuation
+            b1 = tk.Frame(sum_grid, bg=c["card"], padx=12, pady=10)
+            b1.pack(side="left", fill="both", expand=True, padx=(0, 4))
+            b1.config(highlightbackground=c["border"], highlightthickness=1)
+            tk.Label(b1, text="💎 มูลค่ารวมคลังนี้", font=("Segoe UI Semibold", 9), bg=c["card"], fg=c["text_dim"]).pack(anchor="w")
+            val_txt = f"{total_chaos:,.1f} Chaos  (≈ {total_divine:,.2f} Divine)"
+            tk.Label(b1, text=val_txt, font=("Segoe UI Bold", 11), bg=c["card"], fg=c["accent"]).pack(anchor="w", pady=(2, 0))
+
+            # Box 2: Actions / Filter
+            b2 = tk.Frame(sum_grid, bg=c["card"], padx=12, pady=10)
+            b2.pack(side="left", fill="both", expand=True, padx=(4, 0))
+            b2.config(highlightbackground=c["border"], highlightthickness=1)
+            tk.Label(b2, text="⚡ Quick Filter ในเกม", font=("Segoe UI Semibold", 9), bg=c["card"], fg=c["text_dim"]).pack(anchor="w")
+            
+            filter_btn = tk.Label(b2, text="📋 คัดลอก Search Filter (ของแพง)", font=("Segoe UI Semibold", 8), bg=c["border"], fg=c["text"], padx=10, pady=4, cursor="hand2")
+            filter_btn.pack(anchor="w", pady=(4, 0))
+
+            def do_copy_filter(e):
+                top_names = [f'"{it["name"]}"' for it in items[:15]]
+                filter_str = "|".join(top_names)
+                try:
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(filter_str)
+                    filter_btn.config(text="✅ คัดลอกสำเร็จ!", fg=c["success"])
+                    self.root.after(2500, lambda: filter_btn.config(text="📋 คัดลอก Search Filter (ของแพง)", fg=c["text"]))
+                except Exception:
+                    pass
+
+            filter_btn.bind("<Button-1>", do_copy_filter)
+
+            # Items List Container
+            list_card = tk.Frame(results_frame, bg=c["card"], padx=12, pady=10)
+            list_card.pack(fill="both", expand=True)
+            list_card.config(highlightbackground=c["border"], highlightthickness=1)
+
+            hdr_row = tk.Frame(list_card, bg=c["card"])
+            hdr_row.pack(fill="x", pady=(0, 4))
+            tk.Label(hdr_row, text="รายการไอเทมในคลังที่เรียงตามมูลค่า", font=("Segoe UI Semibold", 9), bg=c["card"], fg=c["text"]).pack(side="left")
+            tk.Label(hdr_row, text=f"พบ {val['items_count']} ชิ้น (1 Div = {div_price:.0f}c)", font=("Segoe UI", 8), bg=c["card"], fg=c["text_dim"]).pack(side="right")
+
+            # Canvas & Scrollbar for item list
+            canvas = tk.Canvas(list_card, bg=c["card"], highlightthickness=0)
+            scrollbar = tk.Scrollbar(list_card, orient="vertical", command=canvas.yview)
+            scroll_frame = tk.Frame(canvas, bg=c["card"])
+
+            scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            if not items:
+                tk.Label(scroll_frame, text="ไม่พบไอเทมที่มีมูลค่าในคลังนี้ หรือคลังว่างเปล่า", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"]).pack(pady=20)
+            else:
+                for idx, it in enumerate(items):
+                    row_bg = c["panel_bg"] if idx % 2 == 0 else c["card"]
+                    r_frame = tk.Frame(scroll_frame, bg=row_bg, padx=8, pady=4)
+                    r_frame.pack(fill="x", pady=1)
+
+                    tk.Label(r_frame, text=f"{idx+1}.", font=("Segoe UI", 8), bg=row_bg, fg=c["text_dim"], width=3, anchor="w").pack(side="left")
+                    tk.Label(r_frame, text=it["name"], font=("Segoe UI Semibold", 9), bg=row_bg, fg=c["text"], width=26, anchor="w").pack(side="left")
+                    tk.Label(r_frame, text=f"x{it['stack']}", font=("Segoe UI", 8), bg=row_bg, fg=c["text_dim"], width=6, anchor="w").pack(side="left")
+                    tk.Label(r_frame, text=f"{it['unit_price']:,.1f}c/ชิ้น", font=("Segoe UI", 8), bg=row_bg, fg=c["text_dim"], width=12, anchor="w").pack(side="left")
+                    tk.Label(r_frame, text=f"{it['total_price']:,.1f} Chaos", font=("Segoe UI Semibold", 9), bg=row_bg, fg=c["accent"], anchor="e").pack(side="right", padx=6)
+
+        def do_scan(e=None):
+            l_val = league_entry.get().strip() or "Standard"
+            t_str = tab_entry.get().strip() or "0"
+            try:
+                t_val = int(t_str)
+            except ValueError:
+                t_val = 0
+
+            self._stash_league = l_val
+            self._stash_tab_idx = t_val
+
+            for w in results_frame.winfo_children():
+                w.destroy()
+            
+            load_lbl = tk.Label(results_frame, text="🔄 กำลังดึงข้อมูลคลังและราคาตลาด...", font=("Segoe UI", 10), bg=c["panel_bg"], fg=c["warning"])
+            load_lbl.pack(pady=30)
+
+            def worker():
+                stash_res = stash.fetch_stash_data(config.POESESSID, config.ACCOUNT_NAME, league=l_val, tab_index=t_val, tabs=0)
+                if not stash_res.get("success"):
+                    self.root.after(0, lambda: render_valuation_results(stash_res))
+                    return
+
+                items_raw = stash_res["data"].get("items", [])
+                price_data = pricer.fetch_poe_ninja_prices(league=l_val)
+                val_res = pricer.calculate_stash_valuation(items_raw, price_data)
+
+                out_data = {"success": True, "valuation": val_res}
+                self.root.after(0, lambda: render_valuation_results(out_data))
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        scan_btn.bind("<Button-1>", do_scan)
+        scan_btn.bind("<Enter>", lambda e: scan_btn.config(bg=c["accent"]))
+        scan_btn.bind("<Leave>", lambda e: scan_btn.config(bg=c["accent_dim"]))
+
+        # If POESESSID and Account Name exist, auto scan on tab open!
+        if config.POESESSID and config.ACCOUNT_NAME:
+            do_scan()
+        else:
+            err_card = tk.Frame(results_frame, bg=c["card"], padx=16, pady=16)
+            err_card.pack(fill="x", pady=10)
+            err_card.config(highlightbackground=c["warning"], highlightthickness=1)
+            tk.Label(err_card, text="⚠️ ยังไม่ได้ระบุข้อมูลบัญชี", font=("Segoe UI Semibold", 11), bg=c["card"], fg=c["warning"]).pack(anchor="w")
+            tk.Label(err_card, text="กรุณาไปที่เมนู '⚙️ ตั้งค่าขั้นสูง' แล้วกรอก Account Name และ POESESSID ก่อนใช้งานสแกนราคา", font=("Segoe UI", 9), bg=c["card"], fg=c["text_dim"]).pack(anchor="w", pady=(4, 0))
+
+    # ── TAB 4: ตั้งค่าขั้นสูง (THEMES & AUTO-BOOST) ────────
     def _render_advanced_settings_tab(self):
         c = config.COLORS
         win = self._dash_win
